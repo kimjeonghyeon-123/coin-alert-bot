@@ -111,3 +111,10 @@ def check_simulation_results():
         except Exception as e:
             print(f"[ERROR] Failed to write updated log: {e}")
 
+def log_simulation_result(sim_result):
+    ...
+    log_entry = {
+        ...
+        "evaluated": False,
+        "result": None
+    }
