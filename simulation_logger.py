@@ -7,6 +7,7 @@ from price_logger import get_current_price
 from notifier import send_telegram_message
 
 LOG_FILE = "simulation_log.json"
+LEARNING_FILE = "learning_stats.json"
 
 
 def log_simulation_result(sim_result):
@@ -39,16 +40,57 @@ def log_simulation_result(sim_result):
     }
 
     try:
+        logs = []
         if os.path.exists(LOG_FILE):
             with open(LOG_FILE, 'r') as f:
                 logs = json.load(f)
-        else:
-            logs = []
         logs.append(log_entry)
         with open(LOG_FILE, 'w') as f:
             json.dump(logs, f, indent=2)
     except Exception as e:
         print(f"[ERROR] Logging simulation result failed: {e}")
+
+
+def update_learning_stats(direction, trend, pattern, result):
+    """
+    direction: 'long' or 'short'
+    trend: 'up', 'down', or None
+    pattern: chart pattern name or None
+    result: 'success' or 'fail'
+    """
+    path = LEARNING_FILE
+
+    try:
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                stats = json.load(f)
+        else:
+            stats = {"direction": {}, "trend": {}, "patterns": {}}
+    except:
+        stats = {"direction": {}, "trend": {}, "patterns": {}}
+
+    # Direction
+    if direction not in stats["direction"]:
+        stats["direction"][direction] = {"success": 0, "fail": 0}
+    stats["direction"][direction][result] += 1
+
+    # Trend
+    if trend:
+        if trend not in stats["trend"]:
+            stats["trend"][trend] = {"success": 0, "fail": 0}
+        stats["trend"][trend][result] += 1
+
+    # Pattern
+    if pattern:
+        if pattern not in stats["patterns"]:
+            stats["patterns"][pattern] = {"success": 0, "fail": 0}
+        stats["patterns"][pattern][result] += 1
+
+    try:
+        with open(path, "w") as f:
+            json.dump(stats, f, indent=2)
+    except Exception as e:
+        print(f"[ERROR] Failed to write learning stats: {e}")
 
 
 def check_simulation_results():
@@ -71,7 +113,7 @@ def check_simulation_results():
             continue
 
         elapsed = now - log["unix_timestamp"]
-        if elapsed < 1800:  # 평가까지 30분 대기
+        if elapsed < 1800:  # 평가까지 최소 30분 대기
             continue
 
         direction = log["direction"]
@@ -84,7 +126,7 @@ def check_simulation_results():
                 result = "success"
             elif current_price <= sl:
                 result = "fail"
-        else:
+        else:  # short
             if current_price <= tp:
                 result = "success"
             elif current_price >= sl:
@@ -95,11 +137,30 @@ def check_simulation_results():
             log["result"] = result
             updated = True
 
+            # 자동 학습 업데이트
+            trend = None
+            ma = log.get("moving_averages", {})
+            if ma:
+                if ma.get("ma5") > ma.get("ma20") > ma.get("ma60"):
+                    trend = "up"
+                elif ma.get("ma5") < ma.get("ma20") < ma.get("ma60"):
+                    trend = "down"
+
+            update_learning_stats(
+                direction=direction,
+                trend=trend,
+                pattern=log.get("pattern"),
+                result=result
+            )
+
             msg = f"""📘 *시뮬레이션 평가 결과*
 *방향:* {direction.upper()}
 *진입가:* {log['entry_price']:.2f}
 *TP / SL:* {tp:.2f} / {sl:.2f}
 *현재가:* {current_price:.2f}
+*패턴:* {log.get('pattern', '없음')}
+*예상 승률:* {log.get('expected_winrate', 0)}%
+*추세:* {trend or '판단불가'}
 *결과:* {'✅ 익절 성공' if result == 'success' else '❌ 손절 실패'}
 """
             send_telegram_message(msg)
@@ -110,11 +171,3 @@ def check_simulation_results():
                 json.dump(logs, f, indent=2)
         except Exception as e:
             print(f"[ERROR] Failed to write updated log: {e}")
-
-def log_simulation_result(sim_result):
-    ...
-    log_entry = {
-        ...
-        "evaluated": False,
-        "result": None
-    }
