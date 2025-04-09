@@ -1,73 +1,33 @@
 import json
-import time
 import os
-from result_evaluator import get_penalized_patterns
 
-LOG_FILE = "simulation_log.json"
-PRICE_HISTORY_FILE = "price_history.json"  # price_logger가 쓰는 파일
+PATTERN_STATS_FILE = "pattern_stats.json"
+MAX_RECENT_RESULTS = 50
 
-PENALIZE_PATTERNS = get_penalized_patterns()
+def load_pattern_stats():
+    if os.path.exists(PATTERN_STATS_FILE):
+        with open(PATTERN_STATS_FILE, "r") as f:
+            return json.load(f)
+    return {}
 
+def save_pattern_stats(stats):
+    with open(PATTERN_STATS_FILE, "w") as f:
+        json.dump(stats, f, indent=4)
 
-def evaluate_simulation_results():
-    if not os.path.exists(LOG_FILE) or not os.path.exists(PRICE_HISTORY_FILE):
-        return
+def evaluate_simulation(prediction, actual_result):
+    pattern_stats = load_pattern_stats()
+    for pattern in prediction.get("used_patterns", []):
+        if pattern not in pattern_stats:
+            pattern_stats[pattern] = []
+        
+        result = 1 if actual_result == "success" else 0
+        pattern_stats[pattern].append(result)
+        
+        # 최근 결과 50개로 제한
+        if len(pattern_stats[pattern]) > MAX_RECENT_RESULTS:
+            pattern_stats[pattern] = pattern_stats[pattern][-MAX_RECENT_RESULTS:]
 
-    with open(LOG_FILE, 'r') as f:
-        logs = json.load(f)
+    save_pattern_stats(pattern_stats)
 
-    with open(PRICE_HISTORY_FILE, 'r') as f:
-        price_data = json.load(f)
-
-    updated = False
-    for entry in logs:
-        if entry.get("evaluated"):
-            continue
-
-        timestamp = entry["timestamp"]
-        entry_price = entry["entry_price"]
-        direction = entry["direction"]
-        tp = entry["take_profit"]
-        sl = entry["stop_loss"]
-        pattern = entry.get("pattern")
-
-        # 평가 기준: entry 이후의 가격 흐름
-        matched_result = None
-        for p in price_data:
-            if p["timestamp"] > timestamp:
-                price = p["price"]
-                if direction == "long" and price >= tp:
-                    matched_result = "win"
-                    break
-                elif direction == "long" and price <= sl:
-                    matched_result = "lose"
-                    break
-                elif direction == "short" and price <= tp:
-                    matched_result = "win"
-                    break
-                elif direction == "short" and price >= sl:
-                    matched_result = "lose"
-                    break
-
-        if matched_result:
-            entry["evaluated"] = True
-            entry["result"] = matched_result
-            updated = True
-
-            # 패턴 패널티 반영
-            if matched_result == "lose" and pattern:
-                PENALIZE_PATTERNS[pattern] = PENALIZE_PATTERNS.get(pattern, 0) + 1
-
-    if updated:
-        with open(LOG_FILE, 'w') as f:
-            json.dump(logs, f, indent=2)
-
-    return PENALIZE_PATTERNS
-
-
-def get_penalized_patterns():
-    if not PENALIZE_PATTERNS:
-        evaluate_simulation_results()
-    return PENALIZE_PATTERNS
 
 
