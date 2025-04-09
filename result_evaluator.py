@@ -20,7 +20,7 @@ def evaluate_simulation_results():
 
     updated = False
     for entry in logs:
-        if entry["evaluated"]:
+        if entry.get("evaluated"):
             continue
 
         timestamp = entry["timestamp"]
@@ -65,4 +65,7 @@ def evaluate_simulation_results():
 
 
 def get_penalized_patterns():
+    if not PENALIZE_PATTERNS:
+        evaluate_simulation_results()
     return PENALIZE_PATTERNS
+
