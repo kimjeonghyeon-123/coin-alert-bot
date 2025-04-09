@@ -57,6 +57,16 @@ def run_simulation():
 
 
 # 외부에서도 사용할 수 있는 시뮬레이션 함수
+import json
+from entry_angle_detector import moving_average, detect_chart_pattern
+
+def load_learning_stats():
+    try:
+        with open("learning_stats.json", "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
 def simulate_entry(price_slice, current_price, simulate_mode=False):
     prices = [float(x['close']) for x in price_slice]
     timestamps = [int(x['timestamp']) for x in price_slice]
@@ -69,19 +79,53 @@ def simulate_entry(price_slice, current_price, simulate_mode=False):
     ma60 = moving_average(prices, 60)
 
     trend_score = 0
+    trend = None
     if ma5 and ma20 and ma60:
         if ma5 > ma20 > ma60:
             trend_score += 1
+            trend = "up"
         elif ma5 < ma20 < ma60:
             trend_score -= 1
+            trend = "down"
 
     pattern = detect_chart_pattern(price_slice)
     pattern_score = 0.2 if pattern == "W-Pattern" else -0.2 if pattern == "M-Pattern" else 0
 
-    probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
-    probability = max(0, min(1, probability))
+    base_probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
+    base_probability = max(0, min(1, base_probability))
 
     direction = "long" if change_rate > 0 else "short"
+
+    # 📘 학습 통계 적용
+    stats = load_learning_stats()
+    adjustment = 0
+
+    # 패턴 보정
+    if pattern and pattern in stats.get("patterns", {}):
+        p = stats["patterns"][pattern]
+        total = p["success"] + p["fail"]
+        if total > 5:
+            winrate = p["success"] / total
+            adjustment += (winrate - 0.5) * 0.4  # 최대 ±0.2 보정
+
+    # 추세 보정
+    if trend and trend in stats.get("trend", {}):
+        t = stats["trend"][trend]
+        total = t["success"] + t["fail"]
+        if total > 5:
+            winrate = t["success"] / total
+            adjustment += (winrate - 0.5) * 0.3
+
+    # 방향 보정
+    if direction in stats.get("direction", {}):
+        d = stats["direction"][direction]
+        total = d["success"] + d["fail"]
+        if total > 5:
+            winrate = d["success"] / total
+            adjustment += (winrate - 0.5) * 0.3
+
+    final_probability = max(0, min(1, base_probability + adjustment))
+
     stop_loss = current_price * (0.98 if direction == "long" else 1.02)
     take_profit = current_price * (1.02 if direction == "long" else 0.98)
 
@@ -90,7 +134,7 @@ def simulate_entry(price_slice, current_price, simulate_mode=False):
         "entry_price": current_price,
         "stop_loss": stop_loss,
         "take_profit": take_profit,
-        "win_rate": probability,
+        "win_rate": final_probability,
         "pattern": pattern,
         "ma5": ma5,
         "ma20": ma20,
