@@ -18,11 +18,20 @@ def run_backtest(filepath):
         timestamp = data[i]['timestamp']
 
         prediction = simulate_entry(current_slice, current_price, simulate_mode=True)
+
+        # 예측 결과가 유효한지 확인
+        if not prediction or not all(k in prediction for k in ['entry_price', 'direction', 'stop_loss', 'take_profit']):
+            continue  # 유효하지 않으면 건너뜀
+
         actual_result = simulate_future_outcome(data[i:i+12], prediction)
 
         update_pattern_stats(prediction, actual_result)
-        results.append((timestamp, prediction["direction"], actual_result))
-        
+        results.append({
+            "timestamp": timestamp,
+            "direction": prediction["direction"],
+            "result": actual_result
+        })
+
         time.sleep(0.005)  # 과부하 방지
 
     return results
@@ -35,6 +44,8 @@ def simulate_future_outcome(future_data, prediction):
     direction = prediction["direction"]
     sl = prediction["stop_loss"]
     tp = prediction["take_profit"]
+
+    touched = False  # SL/TP 둘 다 안 닿은 경우를 위한 플래그
 
     for candle in future_data:
         high = float(candle['high'])
@@ -51,4 +62,5 @@ def simulate_future_outcome(future_data, prediction):
             if low <= tp:
                 return "success"
 
-    return "fail"
+    # 여기까지 왔으면 SL/TP 둘 다 닿지 않음
+    return "neutral"
