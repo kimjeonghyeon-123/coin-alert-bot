@@ -1,11 +1,12 @@
 import json
 import time
 import os
+from result_evaluator import get_penalized_patterns
 
 LOG_FILE = "simulation_log.json"
 PRICE_HISTORY_FILE = "price_history.json"  # price_logger가 쓰는 파일
 
-PENALIZE_PATTERNS = {}
+PENALIZE_PATTERNS = get_penalized_patterns()
 
 
 def evaluate_simulation_results():
@@ -68,4 +69,5 @@ def get_penalized_patterns():
     if not PENALIZE_PATTERNS:
         evaluate_simulation_results()
     return PENALIZE_PATTERNS
+
 
