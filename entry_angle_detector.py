@@ -23,7 +23,7 @@ def detect_chart_pattern(prices):
         return "M-Pattern"
     return None
 
-# 추천 레버리지 계산 함수
+# 추천 레버리지 계산
 def calculate_leverage(win_rate, stop_loss_pct):
     base_leverage = 1 if stop_loss_pct > 3 else 2
     if win_rate >= 0.99:
@@ -44,7 +44,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
     prices = [x['price'] for x in history]
     timestamps = [x['timestamp'] for x in history]
 
-    # 가격 변화율
+    # 변화율 계산
     change_rate = (prices[-1] - prices[-6]) / prices[-6] * 100
 
     # 이동평균선
@@ -52,7 +52,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
     ma20 = moving_average(prices, 20)
     ma60 = moving_average(prices, 60)
 
-    # 추세 분석
+    # 추세 점수
     trend_score = 0
     if ma5 and ma20 and ma60:
         if ma5 > ma20 > ma60:
@@ -60,10 +60,13 @@ def check_realtime_entry_signal(is_pattern_allowed):
         elif ma5 < ma20 < ma60:
             trend_score -= 1
 
-    # 변화 속도
-    speed = abs(prices[-1] - prices[-6]) / (timestamps[-1] - timestamps[-6])
+    # 속도 계산
+    time_diff = timestamps[-1] - timestamps[-6]
+    if time_diff == 0:
+        return  # 속도 계산 불가
+    speed = abs(prices[-1] - prices[-6]) / time_diff
 
-    # 차트 패턴 감지
+    # 차트 패턴
     pattern = detect_chart_pattern(history)
     pattern_score = 0.2 if pattern == "W-Pattern" else -0.2 if pattern == "M-Pattern" else 0
 
@@ -72,8 +75,9 @@ def check_realtime_entry_signal(is_pattern_allowed):
     probability = max(0, min(1, probability))
 
     if probability >= 0.7:
-        direction = "Long" if change_rate > 0 else "Short"
+        direction = "long" if change_rate > 0 else "short"
 
+        # 신뢰되지 않은 패턴 차단
         if pattern and not is_pattern_allowed(pattern):
             print(f"[진입 차단] 신뢰되지 않은 패턴: {pattern}")
             return
@@ -86,7 +90,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
 
         message = f"""🚨 *실시간 진입각 탐지!*
 
-*방향:* {direction}
+*방향:* {direction.upper()}
 *현재가:* {current_price:.2f}
 *이동평균:* ma5={ma5:.2f}, ma20={ma20:.2f}, ma60={ma60:.2f}
 *패턴:* {pattern or '없음'}
@@ -95,11 +99,13 @@ def check_realtime_entry_signal(is_pattern_allowed):
 *TP:* {take_profit:.2f}
 *SL:* {stop_loss:.2f}
 """
-        send_telegram_message(message)
+        try:
+            send_telegram_message(message)
+        except Exception as e:
+            print(f"[텔레그램 오류] 메시지 전송 실패: {e}")
+
         execute_entry(pattern, direction, current_price, stop_loss, take_profit)
 
-# 진입 실행 함수 (예시용)
+# 진입 실행 함수 (후속 자동화 가능)
 def execute_entry(pattern, direction, entry_price, stop_loss, take_profit):
-    print(f"[진입 실행] {pattern} | {direction} | 진입가: {entry_price} | SL: {stop_loss} | TP: {take_profit}")
-
-
+    print(f"[진입 실행] {pattern or '패턴 없음'} | {direction} | 진입가: {entry_price:.2f} | SL: {stop_loss:.2f} | TP: {take_profit:.2f}")
