@@ -1,0 +1,22 @@
+# Coin Alert Bot
+
+🔔 실시간 비트코인 거래 신호를 감지하고 텔레그램으로 알림을 보내주는 자동화 봇입니다.
+
+## 주요 기능
+- 고확률 매매 시그널 자동 감지 및 알림
+- 급등/급락, 추세 움직임 실시간 감지
+- 주요 지지/저항선 기반 알림
+- 매수/매도 시뮬레이션 및 성공률 분석
+
+## 사용 기술
+- Python
+- TradingView API
+- Gate.io API
+- Telegram Bot API
+
+## 설치 방법
+```bash
+git clone https://github.com/kimjeonghyeon-123/coin-alert-bot.git
+cd coin-alert-bot
+pip install -r requirements.txt
+python main.py
