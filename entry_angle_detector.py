@@ -1,11 +1,10 @@
-# entry_angle_detector.py
 import json
 import os
 import time
 import statistics
 from notifier import send_telegram_message
 from price_logger import get_recent_prices
-
+from price_fetcher import get_current_price
 
 # 이동평균 계산
 def moving_average(data, period):
@@ -13,8 +12,7 @@ def moving_average(data, period):
         return None
     return sum(data[-period:]) / period
 
-
-# 차트 패턴 감지 (간단한 예시)
+# 간단한 차트 패턴 감지
 def detect_chart_pattern(prices):
     if len(prices) < 5:
         return None
@@ -25,9 +23,8 @@ def detect_chart_pattern(prices):
         return "M-Pattern"
     return None
 
-
-# 진입각 계산 (확률 + 볼륨 + 이평선 + 패턴)
-def analyze_entry():
+# 진입각 분석 및 실시간 감지
+def check_realtime_entry_signal(is_pattern_allowed):
     history = get_recent_prices(60)
     if len(history) < 10:
         return
@@ -43,7 +40,7 @@ def analyze_entry():
     ma20 = moving_average(prices, 20)
     ma60 = moving_average(prices, 60)
 
-    # 이동평균 기반 추세
+    # 추세 분석
     trend_score = 0
     if ma5 and ma20 and ma60:
         if ma5 > ma20 > ma60:
@@ -51,24 +48,46 @@ def analyze_entry():
         elif ma5 < ma20 < ma60:
             trend_score -= 1  # 하락
 
-    # 최근 가격 변화 속도
+    # 변화 속도
     speed = abs(prices[-1] - prices[-6]) / (timestamps[-1] - timestamps[-6])
 
-    # 차트 패턴
+    # 차트 패턴 감지
     pattern = detect_chart_pattern(history)
-    pattern_score = 0.2 if pattern in ["W-Pattern"] else -0.2 if pattern == "M-Pattern" else 0
+    pattern_score = 0.2 if pattern == "W-Pattern" else -0.2 if pattern == "M-Pattern" else 0
 
-    # 최종 확률 계산
+    # 진입 확률 계산
     probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
     probability = max(0, min(1, probability))
 
     if probability >= 0.7:
         direction = "Long" if change_rate > 0 else "Short"
-        message = f"🚨 *실시간 진입각 탐지!*
+
+        # 신뢰되지 않은 패턴 필터링
+        if pattern and not is_pattern_allowed(pattern):
+            print(f"[진입 차단] 신뢰되지 않은 패턴: {pattern}")
+            return
+
+        current_price = get_current_price()
+        stop_loss = current_price * 0.98
+        take_profit = current_price * 1.05
+
+        message = f"""🚨 *실시간 진입각 탐지!*
 
 *방향:* {direction}
-*현재가:* {prices[-1]:.2f}
+*현재가:* {current_price:.2f}
 *이동평균:* ma5={ma5:.2f}, ma20={ma20:.2f}, ma60={ma60:.2f}
 *패턴:* {pattern or '없음'}
-*예상 승률:* {probability * 100:.1f}%"
+*예상 승률:* {probability * 100:.1f}%
+*TP:* {take_profit:.2f}
+*SL:* {stop_loss:.2f}
+"""
         send_telegram_message(message)
+
+        # 진입 실행 (예시 함수)
+        execute_entry(pattern, direction, current_price, stop_loss, take_profit)
+
+
+# 진입 실행 함수 (예시용)
+def execute_entry(pattern, direction, entry_price, stop_loss, take_profit):
+    print(f"[진입 실행] {pattern} | {direction} | 진입가: {entry_price} | SL: {stop_loss} | TP: {take_profit}")
+
