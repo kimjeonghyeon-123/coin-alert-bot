@@ -12,15 +12,18 @@ def load_learning_stats():
         return {}
 
 def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None):
+    if len(prices) < 12:
+        return 0.5, None, None, None  # 데이터 부족 시 기본값 반환
+
     change_rate = (prices[-1] - prices[-12]) / prices[-12] * 100
-    speed = abs(prices[-1] - prices[-12]) / (timestamps[-1] - timestamps[-12])
+    speed = abs(prices[-1] - prices[-12]) / max((timestamps[-1] - timestamps[-12]), 1)
 
     ma5 = moving_average(prices, 5)
     ma20 = moving_average(prices, 20)
     ma60 = moving_average(prices, 60)
 
     trend_score = 0
-    if ma5 and ma20 and ma60:
+    if ma5 is not None and ma20 is not None and ma60 is not None:
         if ma5 > ma20 > ma60:
             trend_score += 1
             trend = "up"
@@ -28,7 +31,13 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
             trend_score -= 1
             trend = "down"
 
-    pattern_score = 0.2 if pattern == "W-Pattern" else -0.2 if pattern == "M-Pattern" else 0
+    pattern_score = 0
+    if pattern:
+        if pattern == "W-Pattern":
+            pattern_score = 0.2
+        elif pattern == "M-Pattern":
+            pattern_score = -0.2
+
     base_probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
     base_probability = max(0, min(1, base_probability))
 
@@ -75,7 +84,6 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     return final_probability, ma5, ma20, ma60
 
-# ✅ 수동 시뮬레이션 전용
 def run_simulation(recent_events=None):
     history = get_recent_prices(120)
     if len(history) < 20:
@@ -84,7 +92,7 @@ def run_simulation(recent_events=None):
     prices = [x['price'] for x in history]
     timestamps = [x['timestamp'] for x in history]
     pattern = detect_chart_pattern(history)
-    direction = "long" if prices[-1] > prices[-12] else "short"
+    direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
     trend = None
     current_time = int(time.time())
 
@@ -103,18 +111,20 @@ def run_simulation(recent_events=None):
 *진입가:* {entry:.2f}
 *손절가:* {stop_loss:.2f}
 *익절가:* {take_profit:.2f}
-*이동평균:* ma5={ma5:.2f}, ma20={ma20:.2f}, ma60={ma60:.2f}
+*이동평균:* ma5={ma5:.2f if ma5 else 'N/A'}, ma20={ma20:.2f if ma20 else 'N/A'}, ma60={ma60:.2f if ma60 else 'N/A'}
 *패턴:* {pattern or '없음'}
 *예상 승률:* {win_rate * 100:.1f}%
 """
     send_telegram_message(message)
 
-# ✅ 실시간 시뮬레이션 + 자동 학습용
 def simulate_entry(price_slice, current_price, simulate_mode=False, recent_events=None):
+    if len(price_slice) < 20:
+        return None
+
     prices = [float(x['close']) for x in price_slice]
     timestamps = [int(x['timestamp']) for x in price_slice]
     pattern = detect_chart_pattern(price_slice)
-    direction = "long" if prices[-1] > prices[-12] else "short"
+    direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
     trend = None
     current_time = int(time.time())
 
@@ -143,7 +153,6 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
     if simulate_mode:
         print("🔍 시뮬레이션 (simulate_mode=True):", result)
 
-    # ✅ 결과 자동 저장 → 추후 자동 평가 & 학습에 사용
     try:
         with open("simulation_results.json", "r") as f:
             data = json.load(f)
@@ -152,6 +161,7 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
 
     data.append(result)
     with open("simulation_results.json", "w") as f:
-        json.dump(data[-500:], f, indent=2)  # 최근 500개만 유지
+        json.dump(data[-500:], f, indent=2)
 
     return result
+
