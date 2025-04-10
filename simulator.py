@@ -32,7 +32,6 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     base_probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
     base_probability = max(0, min(1, base_probability))
 
-    # 📘 학습 통계 기반 보정
     stats = load_learning_stats()
     adjustment = 0
 
@@ -59,11 +58,10 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = max(0, min(1, base_probability + adjustment))
 
-    # ✅ 이벤트 지속시간 반영
     if events and current_time:
         for e in events:
             event_time = e['timestamp']
-            duration = e.get('duration', 3600)  # 기본 1시간
+            duration = e.get('duration', 3600)
             elapsed = current_time - event_time
             if elapsed < duration:
                 weight = 1 - (elapsed / duration)
@@ -77,7 +75,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     return final_probability, ma5, ma20, ma60
 
-# ✅ 실시간 시뮬레이션 실행용 함수
+# ✅ 수동 시뮬레이션 전용
 def run_simulation(recent_events=None):
     history = get_recent_prices(120)
     if len(history) < 20:
@@ -111,7 +109,7 @@ def run_simulation(recent_events=None):
 """
     send_telegram_message(message)
 
-# ✅ 외부에서 호출 가능한 시뮬레이션 함수
+# ✅ 실시간 시뮬레이션 + 자동 학습용
 def simulate_entry(price_slice, current_price, simulate_mode=False, recent_events=None):
     prices = [float(x['close']) for x in price_slice]
     timestamps = [int(x['timestamp']) for x in price_slice]
@@ -129,12 +127,14 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
     take_profit = current_price * (1.02 if direction == "long" else 0.98)
 
     result = {
+        "timestamp": current_time,
         "direction": direction,
         "entry": current_price,
         "stop_loss": stop_loss,
         "take_profit": take_profit,
         "win_rate": win_rate,
         "pattern": pattern,
+        "trend": trend,
         "ma5": ma5,
         "ma20": ma20,
         "ma60": ma60
@@ -142,5 +142,16 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
 
     if simulate_mode:
         print("🔍 시뮬레이션 (simulate_mode=True):", result)
+
+    # ✅ 결과 자동 저장 → 추후 자동 평가 & 학습에 사용
+    try:
+        with open("simulation_results.json", "r") as f:
+            data = json.load(f)
+    except:
+        data = []
+
+    data.append(result)
+    with open("simulation_results.json", "w") as f:
+        json.dump(data[-500:], f, indent=2)  # 최근 500개만 유지
 
     return result
