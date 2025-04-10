@@ -2,11 +2,14 @@ import json
 import os
 import time
 from datetime import datetime
+from weight_optimizer import optimize_weights  # 자동 가중치 최적화 모듈 불러오기
 
 STATS_FILE = "learning_stats.json"
 RESULT_LOG = "simulation_results.json"
 CPI_LOG = "cpi_event_log.json"
+COUNT_FILE = "update_count.txt"
 UPDATE_INTERVAL = 60  # 초 단위 자동 업데이트 주기
+OPTIMIZE_TRIGGER = 20  # 최적화 실행을 위한 누적 학습 수
 
 def load_json(path):
     if not os.path.exists(path):
@@ -18,6 +21,16 @@ def load_json(path):
 def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
+
+def load_count():
+    if os.path.exists(COUNT_FILE):
+        with open(COUNT_FILE, "r") as f:
+            return int(f.read())
+    return 0
+
+def save_count(count):
+    with open(COUNT_FILE, "w") as f:
+        f.write(str(count))
 
 def update_category(stats, category, key, success):
     if key not in stats[category]:
@@ -72,6 +85,8 @@ def update_cpi_learning():
         save_json(CPI_LOG, cpi_logs)
         save_json(STATS_FILE, stats)
         print("📊 CPI 학습 데이터 업데이트 완료")
+
+    return updated
 
 def update_simulation_results():
     stats = load_json(STATS_FILE)
@@ -134,11 +149,23 @@ def update_simulation_results():
     else:
         print("⏸️ 시뮬레이션에 학습할 새 데이터 없음.")
 
+    return updated
+
 if __name__ == "__main__":
     print("🔁 자동 학습 시스템 가동 중...")
+
     while True:
-        update_simulation_results()
-        update_cpi_learning()
+        sim_updated = update_simulation_results()
+        cpi_updated = update_cpi_learning()
+
+        if sim_updated or cpi_updated:
+            count = load_count() + 1
+            save_count(count)
+            print(f"🔄 학습 카운터: {count}")
+
+            if count >= OPTIMIZE_TRIGGER:
+                print("🎯 최적화 조건 충족, 가중치 자동 조정 시작...")
+                optimize_weights()
+                save_count(0)
+
         time.sleep(UPDATE_INTERVAL)
-
-
