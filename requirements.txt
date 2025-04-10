@@ -1,0 +1,10 @@
+pandas
+numpy
+matplotlib
+scikit-learn
+statsmodels
+requests
+beautifulsoup4
+lxml
+schedule
+python-telegram-bot
