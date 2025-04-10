@@ -2,87 +2,8 @@ import time
 import json
 from price_logger import get_recent_prices
 from notifier import send_telegram_message
-from entry_angle_detector import moving_average, detect_chart_pattern
-
-def load_learning_stats():
-    try:
-        with open("learning_stats.json", "r") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None):
-    if len(prices) < 12:
-        return 0.5, None, None, None  # 데이터 부족 시 기본값 반환
-
-    change_rate = (prices[-1] - prices[-12]) / prices[-12] * 100
-    speed = abs(prices[-1] - prices[-12]) / max((timestamps[-1] - timestamps[-12]), 1)
-
-    ma5 = moving_average(prices, 5)
-    ma20 = moving_average(prices, 20)
-    ma60 = moving_average(prices, 60)
-
-    trend_score = 0
-    if ma5 is not None and ma20 is not None and ma60 is not None:
-        if ma5 > ma20 > ma60:
-            trend_score += 1
-            trend = "up"
-        elif ma5 < ma20 < ma60:
-            trend_score -= 1
-            trend = "down"
-
-    pattern_score = 0
-    if pattern:
-        if pattern == "W-Pattern":
-            pattern_score = 0.2
-        elif pattern == "M-Pattern":
-            pattern_score = -0.2
-
-    base_probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
-    base_probability = max(0, min(1, base_probability))
-
-    stats = load_learning_stats()
-    adjustment = 0
-
-    if pattern and pattern in stats.get("patterns", {}):
-        p = stats["patterns"][pattern]
-        total = p["success"] + p["fail"]
-        if total > 5:
-            winrate = p["success"] / total
-            adjustment += (winrate - 0.5) * 0.4
-
-    if trend and trend in stats.get("trend", {}):
-        t = stats["trend"][trend]
-        total = t["success"] + t["fail"]
-        if total > 5:
-            winrate = t["success"] / total
-            adjustment += (winrate - 0.5) * 0.3
-
-    if direction in stats.get("direction", {}):
-        d = stats["direction"][direction]
-        total = d["success"] + d["fail"]
-        if total > 5:
-            winrate = d["success"] / total
-            adjustment += (winrate - 0.5) * 0.3
-
-    final_probability = max(0, min(1, base_probability + adjustment))
-
-    if events and current_time:
-        for e in events:
-            event_time = e['timestamp']
-            duration = e.get('duration', 3600)
-            elapsed = current_time - event_time
-            if elapsed < duration:
-                weight = 1 - (elapsed / duration)
-                if e['impact'] == "high":
-                    final_probability += 0.2 * weight
-                elif e['impact'] == "medium":
-                    final_probability += 0.1 * weight
-                elif e['impact'] == "low":
-                    final_probability += 0.05 * weight
-        final_probability = max(0, min(1, final_probability))
-
-    return final_probability, ma5, ma20, ma60
+from entry_angle_detector import detect_chart_pattern
+from decision_adjuster import calculate_probability
 
 def run_simulation(recent_events=None):
     history = get_recent_prices(120)
@@ -164,4 +85,3 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
         json.dump(data[-500:], f, indent=2)
 
     return result
-
