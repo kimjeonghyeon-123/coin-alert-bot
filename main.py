@@ -6,7 +6,7 @@ from price_logger import update_price
 from entry_angle_detector import check_realtime_entry_signal
 from config import MODE
 
-# ✅ 추가된 import
+# ✅ 이벤트 감지 관련 import
 from event_monitor import check_new_events, get_recent_events
 from notifier import send_event_alert
 
@@ -39,20 +39,24 @@ print("[시스템 시작] Bitcoin 실시간 모니터링 중...")
 while True:
     now = time.time()
 
+    # 가격 기록
     if now - t_last_price >= PRICE_LOG_INTERVAL:
         update_price()
         t_last_price = now
 
+    # 실시간 진입 각도 체크
     if now - t_last_entry >= ENTRY_SIGNAL_INTERVAL:
         recent_events = get_recent_events()
-        check_realtime_entry_signal(is_pattern_allowed, recent_events=recent_events)  # 이벤트 고려
+        check_realtime_entry_signal(is_pattern_allowed, recent_events=recent_events)
         t_last_entry = now
 
+    # 시뮬레이션 실행
     if now - t_last_sim >= SIMULATION_INTERVAL:
         recent_events = get_recent_events()
-        run_simulation(recent_events=recent_events)  # 이벤트 고려
+        run_simulation(recent_events=recent_events)
         t_last_sim = now
 
+    # ✅ 이벤트 감지 주기적 호출
     if now - t_last_event >= EVENT_CHECK_INTERVAL:
         new_events = check_new_events()
         if new_events:
