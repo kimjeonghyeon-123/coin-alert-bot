@@ -30,14 +30,18 @@ def load_learning_stats():
 
 def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None):
     weights = load_weights()
+    stats = load_learning_stats()
 
+    # 가격 변화율, 속도 계산
     change_rate = (prices[-1] - prices[-12]) / prices[-12] * 100
     speed = abs(prices[-1] - prices[-12]) / (timestamps[-1] - timestamps[-12])
 
+    # 이동 평균
     ma5 = moving_average(prices, 5)
     ma20 = moving_average(prices, 20)
     ma60 = moving_average(prices, 60)
 
+    # 추세 분석
     trend_score = 0
     if ma5 and ma20 and ma60:
         if ma5 > ma20 > ma60:
@@ -47,12 +51,14 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
             trend_score -= 1
             trend = "down"
 
+    # 패턴 점수
     pattern_score = 0.2 if pattern == "W-Pattern" else -0.2 if pattern == "M-Pattern" else 0
 
+    # 초기 확률
     base_probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
     base_probability = max(0, min(1, base_probability))
 
-    stats = load_learning_stats()
+    # 학습 기반 가중치 조정
     adjustment = 0
 
     if pattern and pattern in stats.get("patterns", {}):
@@ -78,6 +84,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = max(0, min(1, base_probability + adjustment))
 
+    # 추세 각도 반영
     angle = analyze_trend_angle(prices)
     if direction == "long" and angle > 50:
         final_probability += weights["angle"]
@@ -86,10 +93,12 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     elif abs(angle) < 20:
         final_probability -= weights["angle"]
 
+    # 꺾이는 지점 반영
     inflections = detect_inflection_points(prices)
     if inflections and abs(len(prices) - 1 - inflections[-1]) <= 2:
         final_probability += weights["inflection"]
 
+    # 이벤트 영향 반영
     if events and current_time:
         for e in events:
             event_time = e['timestamp']
@@ -106,3 +115,4 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
                     final_probability += weights["event_low"] * weight_factor
 
     return max(0, min(1, final_probability)), ma5, ma20, ma60
+
