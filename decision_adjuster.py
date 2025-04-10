@@ -1,72 +1,85 @@
 import json
-import os
+import time
+from entry_angle_detector import moving_average
 
-LEARNING_STATS_PATH = "learning_stats.json"
-
+# 학습 데이터 로딩
 def load_learning_stats():
-    if not os.path.exists(LEARNING_STATS_PATH):
-        return {
-            "patterns": {},
-            "trend": {},
-            "direction": {},
-            "events": {}
-        }
-
     try:
-        with open(LEARNING_STATS_PATH, "r") as f:
+        with open("learning_stats.json", "r") as f:
             return json.load(f)
-    except json.JSONDecodeError:
-        return {
-            "patterns": {},
-            "trend": {},
-            "direction": {},
-            "events": {}
-        }
+    except:
+        return {}
 
-def adjust_confidence(base_confidence, detected_patterns=[], direction=None, trend=None, event_key=None):
+# 확률 계산 핵심 함수
+def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None):
+    # 5분 동안 가격 변화율 및 속도
+    change_rate = (prices[-1] - prices[-12]) / prices[-12] * 100
+    speed = abs(prices[-1] - prices[-12]) / (timestamps[-1] - timestamps[-12])
+
+    # 이동 평균 계산
+    ma5 = moving_average(prices, 5)
+    ma20 = moving_average(prices, 20)
+    ma60 = moving_average(prices, 60)
+
+    # 추세 판단 (이동평균 정렬)
+    trend_score = 0
+    if ma5 and ma20 and ma60:
+        if ma5 > ma20 > ma60:
+            trend_score += 1
+            trend = "up"
+        elif ma5 < ma20 < ma60:
+            trend_score -= 1
+            trend = "down"
+
+    # 패턴 보정
+    pattern_score = 0.2 if pattern == "W-Pattern" else -0.2 if pattern == "M-Pattern" else 0
+
+    # 기초 승률 계산
+    base_probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
+    base_probability = max(0, min(1, base_probability))
+
+    # 학습 기반 보정
     stats = load_learning_stats()
-    confidence = base_confidence
+    adjustment = 0
 
-    # 패턴 기반 보정
-    for pattern in detected_patterns:
-        pattern_stats = stats.get("patterns", {}).get(pattern)
-        if pattern_stats:
-            total = pattern_stats.get("success", 0) + pattern_stats.get("fail", 0)
-            if total >= 5:
-                success_rate = pattern_stats["success"] / total
-                adjustment = (success_rate - 0.5) * 0.4  # ±20% 영향
-                confidence += adjustment
+    if pattern and pattern in stats.get("patterns", {}):
+        p = stats["patterns"][pattern]
+        total = p["success"] + p["fail"]
+        if total > 5:
+            winrate = p["success"] / total
+            adjustment += (winrate - 0.5) * 0.4
 
-    # 방향 기반 보정 (long/short)
-    if direction:
-        direction_stats = stats.get("direction", {}).get(direction)
-        if direction_stats:
-            total = direction_stats.get("success", 0) + direction_stats.get("fail", 0)
-            if total >= 3:
-                success_rate = direction_stats["success"] / total
-                adjustment = (success_rate - 0.5) * 0.3  # ±15% 영향
-                confidence += adjustment
+    if trend and trend in stats.get("trend", {}):
+        t = stats["trend"][trend]
+        total = t["success"] + t["fail"]
+        if total > 5:
+            winrate = t["success"] / total
+            adjustment += (winrate - 0.5) * 0.3
 
-    # 추세 기반 보정 (up/down/sideways 등)
-    if trend:
-        trend_stats = stats.get("trend", {}).get(trend)
-        if trend_stats:
-            total = trend_stats.get("success", 0) + trend_stats.get("fail", 0)
-            if total >= 3:
-                success_rate = trend_stats["success"] / total
-                adjustment = (success_rate - 0.5) * 0.3  # ±15% 영향
-                confidence += adjustment
+    if direction in stats.get("direction", {}):
+        d = stats["direction"][direction]
+        total = d["success"] + d["fail"]
+        if total > 5:
+            winrate = d["success"] / total
+            adjustment += (winrate - 0.5) * 0.3
 
-    # 이벤트 기반 보정 (예: 'fomc_hawkish', 'cpi_hot' 등)
-    if event_key:
-        event_stats = stats.get("events", {}).get(event_key)
-        if event_stats:
-            total = event_stats.get("success", 0) + event_stats.get("fail", 0)
-            if total >= 3:
-                success_rate = event_stats["success"] / total
-                adjustment = (success_rate - 0.5) * 0.2  # ±10% 영향
-                confidence += adjustment
+    final_probability = max(0, min(1, base_probability + adjustment))
 
-    # 안전 범위 내 보정
-    confidence = max(0, min(1, confidence))
-    return round(confidence, 4)
+    # 이벤트 영향 반영
+    if events and current_time:
+        for e in events:
+            event_time = e['timestamp']
+            duration = e.get('duration', 3600)
+            elapsed = current_time - event_time
+            if elapsed < duration:
+                weight = 1 - (elapsed / duration)
+                if e['impact'] == "high":
+                    final_probability += 0.2 * weight
+                elif e['impact'] == "medium":
+                    final_probability += 0.1 * weight
+                elif e['impact'] == "low":
+                    final_probability += 0.05 * weight
+
+        final_probability = max(0, min(1, final_probability))
+
+    return final_probability, ma5, ma20, ma60
