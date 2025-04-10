@@ -4,6 +4,7 @@ import time
 
 STATS_FILE = "learning_stats.json"
 RESULT_LOG = "simulation_results.json"
+UPDATE_INTERVAL = 60  # 몇 초마다 자동 업데이트할지 설정 (예: 60초)
 
 def load_json(path):
     if not os.path.exists(path):
@@ -84,3 +85,12 @@ def update_stats_from_results():
     if updated:
         save_json(STATS_FILE, stats)
         save_json(RESULT_LOG, {"logs": new_results})
+        print("[업데이트 완료] 학습 통계 및 결과 반영됨.")
+    else:
+        print("[대기 중] 새로운 결과 없음.")
+
+if __name__ == "__main__":
+    print("⏳ 자동 학습 업데이트 시작...")
+    while True:
+        update_stats_from_results()
+        time.sleep(UPDATE_INTERVAL)
