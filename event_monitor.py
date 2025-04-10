@@ -4,10 +4,10 @@ import time
 from datetime import datetime
 from notifier import send_telegram_message
 
-# 더미 API (실제 URL로 교체 필요)
-NEWS_API_URL = "https://example-news-api.com/bitcoin/events"
-ECONOMIC_DATA_URL = "https://example-economy-api.com/releases"
-ORDER_FLOW_API = "https://example-whale-tracker.com/flows"
+# 실 API 예시 (API 키나 쿼리 필요 시 수정 요망)
+NEWS_API_URL = "https://cryptopanic.com/api/v1/posts/?auth_token=YOUR_TOKEN&currencies=BTC"
+ECONOMIC_DATA_URL = "https://www.alphavantage.co/query?function=CPI&apikey=YOUR_API_KEY"
+ORDER_FLOW_API = "https://api.whale-alert.io/v1/transactions?api_key=YOUR_API_KEY&min_value=500000"
 
 # 최근 감지된 이벤트들 저장
 recent_events = []
@@ -16,7 +16,8 @@ def fetch_recent_news():
     try:
         response = requests.get(NEWS_API_URL)
         if response.status_code == 200:
-            return response.json()  # [{"title": "...", "impact": "high", "timestamp": ...}]
+            posts = response.json().get("results", [])
+            return [{"title": p["title"], "impact": "high", "timestamp": time.time()} for p in posts]
     except Exception as e:
         print(f"[뉴스 수집 오류] {e}")
     return []
@@ -25,7 +26,7 @@ def fetch_economic_indicators():
     try:
         response = requests.get(ECONOMIC_DATA_URL)
         if response.status_code == 200:
-            return response.json()  # [{"indicator": "CPI", "value": 3.2, "expected": 3.1}]
+            return [{"indicator": "CPI", "value": 3.2, "expected": 3.1, "timestamp": time.time()}]  # 예시 구조
     except Exception as e:
         print(f"[경제지표 수집 오류] {e}")
     return []
@@ -34,13 +35,14 @@ def fetch_order_flow():
     try:
         response = requests.get(ORDER_FLOW_API)
         if response.status_code == 200:
-            return response.json()  # [{"type": "sell", "amount": 1200, "price": 69200}]
+            data = response.json().get("transactions", [])
+            return [{"type": tx["transaction_type"], "amount": tx["amount"], "price": tx["amount_usd"], "timestamp": tx["timestamp"]} for tx in data]
     except Exception as e:
         print(f"[고래흐름 수집 오류] {e}")
     return []
 
 def analyze_event_impact(event):
-    # 간단한 영향 점수 계산
+    # 향후 학습 기반 자동화 가능
     if event.get("impact") == "high":
         return 0.8
     elif event.get("impact") == "medium":
@@ -53,6 +55,11 @@ def is_duplicate_event(summary):
         if e["summary"] == summary and now - e["timestamp"] < 300:
             return True
     return False
+
+def trim_recent_events(limit=100):
+    # 최근 이벤트 리스트를 제한하여 메모리 누수 방지
+    global recent_events
+    recent_events = recent_events[-limit:]
 
 def check_new_events():
     global recent_events
@@ -73,7 +80,8 @@ def check_new_events():
         if surprise > 0.05:
             summary = f"{econ['indicator']} 발표 - 예상치 대비 변화율 {round(surprise*100, 1)}%"
             if not is_duplicate_event(summary):
-                high_impact_events.append(("경제지표", summary, round(surprise, 2)))
+                score = min(0.8, 0.4 + surprise)  # max 0.8
+                high_impact_events.append(("경제지표", summary, round(score, 2)))
 
     for flow in order_flows:
         if flow["amount"] >= 1000:
@@ -88,16 +96,17 @@ def check_new_events():
             "timestamp": time.time()
         }
         recent_events.append(event_obj)
+        trim_recent_events()
 
         msg = f"🚨 *{kind} 이벤트 감지됨*\n내용: `{detail}`\n영향 추정 점수: {score}"
         send_telegram_message(msg)
 
     return high_impact_events
 
-# 최근 10분 이내 이벤트 조회 (시뮬레이션 등에서 사용)
 def get_recent_events():
     cutoff = time.time() - 600
     return [e for e in recent_events if e["timestamp"] >= cutoff]
 
 if __name__ == "__main__":
     check_new_events()
+
