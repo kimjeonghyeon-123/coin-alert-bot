@@ -1,11 +1,93 @@
 import time
 import json
+import os
 from price_logger import get_recent_prices
 from notifier import send_telegram_message
 from entry_angle_detector import detect_chart_pattern
 from decision_adjuster import calculate_probability
 
+
+def save_prediction(prediction):
+    try:
+        with open("prediction_log.json", "r") as f:
+            history = json.load(f)
+    except:
+        history = []
+
+    history.append(prediction)
+    with open("prediction_log.json", "w") as f:
+        json.dump(history[-1000:], f, indent=2)
+
+
+def evaluate_predictions():
+    try:
+        with open("prediction_log.json", "r") as f:
+            predictions = json.load(f)
+    except:
+        return
+
+    now = int(time.time())
+    updated_predictions = []
+    for p in predictions:
+        if 'result' in p:
+            updated_predictions.append(p)
+            continue
+
+        if now - p['timestamp'] >= 60 * 60 * 3:
+            future_prices = get_recent_prices(1)  # 가장 최근 가격 가져옴
+            if not future_prices:
+                continue
+            future_price = future_prices[-1]['price']
+            entry = p['entry']
+            direction = p['direction']
+            result = "success" if (
+                (direction == "long" and future_price >= p['take_profit']) or
+                (direction == "short" and future_price <= p['take_profit'])
+            ) else "fail"
+            p['result'] = result
+            update_learning_stats(p)
+        updated_predictions.append(p)
+
+    with open("prediction_log.json", "w") as f:
+        json.dump(updated_predictions[-1000:], f, indent=2)
+
+
+def update_learning_stats(prediction):
+    try:
+        with open("learning_stats.json", "r") as f:
+            stats = json.load(f)
+    except:
+        stats = {}
+
+    key = prediction['pattern'] or 'none'
+    if key not in stats:
+        stats[key] = {"success": 0, "fail": 0}
+
+    stats[key][prediction['result']] += 1
+
+    with open("learning_stats.json", "w") as f:
+        json.dump(stats, f, indent=2)
+
+    update_weights_from_learning(stats)
+
+
+def update_weights_from_learning(stats):
+    weights = {}
+    for key, s in stats.items():
+        total = s['success'] + s['fail']
+        if total < 3:
+            weights[key] = 1.0  # 초기 가중치
+        else:
+            success_rate = s['success'] / total
+            weights[key] = round(0.5 + success_rate, 2)
+
+    with open("weights.json", "w") as f:
+        json.dump(weights, f, indent=2)
+
+
 def run_simulation(recent_events=None):
+    evaluate_predictions()
+
     history = get_recent_prices(120)
     if len(history) < 20:
         return
@@ -37,6 +119,20 @@ def run_simulation(recent_events=None):
 *예상 승률:* {win_rate * 100:.1f}%
 """
     send_telegram_message(message)
+
+    # 저장
+    prediction = {
+        "timestamp": current_time,
+        "direction": direction,
+        "entry": entry,
+        "stop_loss": stop_loss,
+        "take_profit": take_profit,
+        "pattern": pattern,
+        "trend": trend,
+        "win_rate": win_rate
+    }
+    save_prediction(prediction)
+
 
 def simulate_entry(price_slice, current_price, simulate_mode=False, recent_events=None):
     if len(price_slice) < 20:
@@ -85,3 +181,4 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
         json.dump(data[-500:], f, indent=2)
 
     return result
+
