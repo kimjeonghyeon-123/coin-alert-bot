@@ -5,6 +5,8 @@ import statistics
 from notifier import send_telegram_message
 from price_logger import get_recent_prices
 from price_fetcher import get_current_price
+from cpi_tracker import get_latest_cpi_direction
+from event_impact_estimator import estimate_cpi_impact
 
 # 이동평균 계산
 def moving_average(data, period):
@@ -88,6 +90,14 @@ def check_realtime_entry_signal(is_pattern_allowed):
         stop_loss_pct = abs(current_price - stop_loss) / current_price * 100
         leverage = calculate_leverage(probability, stop_loss_pct)
 
+        # 🧠 CPI 예측 근거 추가
+        cpi_dir = get_latest_cpi_direction()
+        cpi_reason = ""
+        if cpi_dir:
+            cpi_info = estimate_cpi_impact(cpi_dir)
+            if cpi_info["known"]:
+                cpi_reason = f"\n*CPI 근거:* '{cpi_dir}' 방향은 과거 평균 {cpi_info['average_change_percent']}%, 상승 확률 {cpi_info['positive_rate_percent']}%로 '{cpi_info['bias']}' 경향"
+
         message = f"""🚨 *실시간 진입각 탐지!*
 
 *방향:* {direction.upper()}
@@ -97,7 +107,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
 *예상 승률:* {probability * 100:.1f}%
 *추천 레버리지:* {leverage}x
 *TP:* {take_profit:.2f}
-*SL:* {stop_loss:.2f}
+*SL:* {stop_loss:.2f}{cpi_reason}
 """
         try:
             send_telegram_message(message)
