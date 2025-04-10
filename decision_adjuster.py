@@ -1,6 +1,7 @@
 import json
 import time
 from entry_angle_detector import moving_average
+from trend_angle_analyzer import analyze_trend_angle, detect_inflection_points
 
 # 학습 데이터 로딩
 def load_learning_stats():
@@ -65,7 +66,21 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = max(0, min(1, base_probability + adjustment))
 
-    # 이벤트 영향 반영
+    # 📌 빗각 기반 보정
+    angle = analyze_trend_angle(prices)
+    if direction == "long" and angle > 50:
+        final_probability += 0.05
+    elif direction == "short" and angle < -50:
+        final_probability += 0.05
+    elif abs(angle) < 20:
+        final_probability -= 0.05
+
+    # 📌 변곡점 기반 보정
+    inflections = detect_inflection_points(prices)
+    if inflections and abs(len(prices) - 1 - inflections[-1]) <= 2:
+        final_probability += 0.03
+
+    # 📌 이벤트 영향 반영
     if events and current_time:
         for e in events:
             event_time = e['timestamp']
@@ -80,6 +95,5 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
                 elif e['impact'] == "low":
                     final_probability += 0.05 * weight
 
-        final_probability = max(0, min(1, final_probability))
+    return max(0, min(1, final_probability)), ma5, ma20, ma60
 
-    return final_probability, ma5, ma20, ma60
