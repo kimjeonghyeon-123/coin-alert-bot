@@ -1,8 +1,12 @@
 import json
 import os
 import time
-from datetime import datetime
-from price_fetcher import get_current_price  # BTC 실시간 가격 불러오기
+from datetime import datetime, timedelta
+from price_fetcher import get_current_price
+from learning_updater import update_learning_data_from_event
+from event_impact_estimator import estimate_next_direction  # 다음 CPI 방향 예측
+
+import requests
 
 CPI_EVENT_LOG = "cpi_event_log.json"
 BTC_PRICE_LOG = "btc_price_log.json"
@@ -17,10 +21,27 @@ def load_json(path):
     with open(path, "r") as f:
         return json.load(f)
 
+def fetch_latest_cpi():
+    """
+    CPI 예상치와 실제치 자동 수집 (tradingeconomics API 등 필요 시 API 연동)
+    """
+    try:
+        response = requests.get("https://api.tradingeconomics.com/calendar/country/united-states?c=guest:guest")
+        data = response.json()
+        for event in data:
+            if event["category"] == "CPI" and event["actual"]:
+                return {
+                    "time": event["date"],
+                    "expected": float(event["forecast"]),
+                    "actual": float(event["actual"])
+                }
+    except Exception as e:
+        print("❌ CPI 데이터 수집 오류:", e)
+    return None
+
 def log_cpi_event(event_time, expected_cpi, actual_cpi):
     diff = actual_cpi - expected_cpi
     direction = "hot" if diff > 0 else "cool" if diff < 0 else "inline"
-    
     entry_price = get_current_price()
     timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -36,8 +57,9 @@ def log_cpi_event(event_time, expected_cpi, actual_cpi):
     save_json(CPI_EVENT_LOG, log)
     print(f"[✅ CPI 기록됨] 예상: {expected_cpi} / 실제: {actual_cpi} / BTC: {entry_price}")
 
+    return direction, timestamp  # 분석 및 학습용 반환
+
 def analyze_cpi_reaction(cpi_time_str, duration_min=60):
-    """CPI 발표 후 duration 분 동안의 비트코인 가격 변화를 분석"""
     price_log = load_json(BTC_PRICE_LOG)
     cpi_time = datetime.strptime(cpi_time_str, "%Y-%m-%d %H:%M:%S")
 
@@ -49,7 +71,7 @@ def analyze_cpi_reaction(cpi_time_str, duration_min=60):
 
     if not prices:
         print("📭 해당 시간대 가격 데이터 없음.")
-        return
+        return None
 
     start_price = prices[0][1]
     end_price = prices[-1][1]
@@ -58,14 +80,23 @@ def analyze_cpi_reaction(cpi_time_str, duration_min=60):
     print(f"📊 CPI 반응 분석: {duration_min}분 동안 {change_percent:.2f}% 변화")
     return change_percent
 
-# 테스트용 수동 실행 예시
-if __name__ == "__main__":
-    # 수동 입력 테스트
-    log_cpi_event(
-        event_time="2025-04-10 12:30:00",
-        expected_cpi=3.3,
-        actual_cpi=3.7
-    )
+def auto_process_cpi_event():
+    cpi_data = fetch_latest_cpi()
+    if not cpi_data:
+        return
 
-    # 반응 분석 (이전에 기록된 가격 로그가 있다고 가정)
-    analyze_cpi_reaction("2025-04-10 12:30:00", duration_min=60)
+    event_time = cpi_data["time"]
+    expected = cpi_data["expected"]
+    actual = cpi_data["actual"]
+
+    direction, ts = log_cpi_event(event_time, expected, actual)
+    change = analyze_cpi_reaction(ts, duration_min=60)
+
+    if change is not None:
+        update_learning_data_from_event("CPI", direction, change)
+        print("🧠 학습 반영 완료")
+
+# 향후 CPI 예측 요청 시 호출
+def predict_next_cpi_reaction():
+    return estimate_next_direction("CPI")
+
