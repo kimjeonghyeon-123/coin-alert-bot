@@ -99,7 +99,10 @@ def check_realtime_entry_signal(is_pattern_allowed):
             if cpi_info["known"]:
                 cpi_reason = f"\n*CPI 근거:* '{event_key}'은 과거 평균 {cpi_info['average_change_percent']}%, 상승 확률 {cpi_info['positive_rate_percent']}% → '{cpi_info['bias']}' 경향"
 
-        message = f"""🚨 *실시간 진입각 탐지!*  
+        # 강력 신호 구분
+        signal_strength = "🔥 강력 신호" if adjusted_confidence >= 0.90 else "✅ 추천 신호"
+
+        message = f"""{signal_strength} *실시간 진입각 탐지!*  
 *방향:* {direction.upper()}  
 *현재가:* {current_price:.2f}  
 *이동평균:* ma5={ma5:.2f}, ma20={ma20:.2f}, ma60={ma60:.2f}  
@@ -119,4 +122,5 @@ def check_realtime_entry_signal(is_pattern_allowed):
 # 진입 실행 함수
 def execute_entry(patterns, direction, entry_price, stop_loss, take_profit):
     print(f"[진입 실행] {', '.join(patterns) if patterns else '패턴 없음'} | {direction.upper()} | 진입가: {entry_price:.2f} | SL: {stop_loss:.2f} | TP: {take_profit:.2f}")
+
 
