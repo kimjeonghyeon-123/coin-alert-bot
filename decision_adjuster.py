@@ -1,6 +1,6 @@
 import json
 import time
-from entry_angle_detector import moving_average
+from utils import moving_average
 from trend_angle_analyzer import analyze_trend_angle, detect_inflection_points
 
 # 외부 가중치 로딩
