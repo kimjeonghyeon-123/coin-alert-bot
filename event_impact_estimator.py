@@ -37,8 +37,42 @@ def estimate_cpi_impact(direction):
         "message": f"CPI '{direction}' 발생 시 평균 변화율은 {avg_change:.2f}%. {bias} 경향이며, {prob}% 확률로 상승."
     }
 
+def estimate_next_direction(event):
+    """
+    CPI 이벤트 데이터를 기반으로 다음 방향성을 추정.
+    """
+    if event.get("type") == "CPI":
+        value = event.get("value")
+        forecast = event.get("forecast")
+        if value is None or forecast is None:
+            return "inline"
+        if value > forecast:
+            return "hot"
+        elif value < forecast:
+            return "cool"
+        else:
+            return "inline"
+    return "neutral"
+
+def estimate_impact_duration(event):
+    """
+    이벤트별 평균 지속시간을 추정 (학습된 통계를 기반으로).
+    """
+    stats = load_json(STATS_FILE)
+    if "event_durations" not in stats:
+        return 3600  # 기본 1시간
+
+    key = f"{event.get('type','')}_{event.get('source','')}"
+    if key in stats["event_durations"]:
+        data = stats["event_durations"][key]
+        if data["count"] > 0:
+            return int(data["total"] / data["count"])
+
+    return 3600  # 기본값
+
 # 예시 실행
 if __name__ == "__main__":
     for d in ["hot", "cool", "inline"]:
         result = estimate_cpi_impact(d)
         print(f"[📊 {d.upper()} 예측] {result['message']}")
+
