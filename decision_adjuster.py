@@ -1,7 +1,8 @@
 import json
 import time
 from utils import moving_average
-from trend_angle_analyzer import analyze_trend_angle, detect_inflection_points
+from trend_angle_analyzer import analyze_trend_angle_and_inflection
+
 
 # 외부 가중치 로딩
 def load_weights():
@@ -85,7 +86,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     final_probability = max(0, min(1, base_probability + adjustment))
 
     # 추세 각도 반영
-    angle = analyze_trend_angle(prices)
+    angle = analyze_trend_angle_and_inflection()(prices)
     if direction == "long" and angle > 50:
         final_probability += weights["angle"]
     elif direction == "short" and angle < -50:
