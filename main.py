@@ -47,7 +47,7 @@ while True:
     # 실시간 진입 각도 체크
     if now - t_last_entry >= ENTRY_SIGNAL_INTERVAL:
         recent_events = get_recent_events()
-        check_realtime_entry_signal(is_pattern_allowed, recent_events=recent_events)
+        check_realtime_entry_signal(is_pattern_allowed)
         t_last_entry = now
 
     # 시뮬레이션 실행
