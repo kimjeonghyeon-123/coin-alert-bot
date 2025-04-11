@@ -9,6 +9,7 @@ from volume_analyzer import analyze_volume_behavior
 from trend_detector import get_current_trend
 from decision_adjuster import adjust_confidence
 from direction_predictor import predict_direction
+from utils import moving_average  
 
 MIN_WIN_RATE_THRESHOLD = 0.70
 
