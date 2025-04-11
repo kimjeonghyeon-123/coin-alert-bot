@@ -150,6 +150,7 @@ def update_simulation_results():
         print("⏸️ 시뮬레이션에 학습할 새 데이터 없음.")
 
     return updated
+    
     def update_learning_data_from_event(event_id, result):
     """
     개별 이벤트 결과(success/fail)를 기록하고 일정 횟수 도달 시 가중치 최적화를 트리거합니다.
