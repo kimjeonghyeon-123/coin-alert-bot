@@ -150,6 +150,33 @@ def update_simulation_results():
         print("⏸️ 시뮬레이션에 학습할 새 데이터 없음.")
 
     return updated
+    def update_learning_data_from_event(event_id, result):
+    """
+    개별 이벤트 결과(success/fail)를 기록하고 일정 횟수 도달 시 가중치 최적화를 트리거합니다.
+    """
+    stats = load_json(STATS_FILE)
+
+    if "events" not in stats:
+        stats["events"] = {}
+
+    if event_id not in stats["events"]:
+        stats["events"][event_id] = {"success": 0, "fail": 0}
+
+    if result == "success":
+        stats["events"][event_id]["success"] += 1
+    elif result == "fail":
+        stats["events"][event_id]["fail"] += 1
+
+    save_json(STATS_FILE, stats)
+
+    count = load_count() + 1
+    save_count(count)
+
+    if count >= OPTIMIZE_TRIGGER:
+        print("🎯 이벤트 기반 학습도 최적화 조건 충족!")
+        optimize_weights()
+        save_count(0)
+
 
 if __name__ == "__main__":
     print("🔁 자동 학습 시스템 가동 중...")
