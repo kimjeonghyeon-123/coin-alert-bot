@@ -127,3 +127,16 @@ def predict_next_cpi_reaction():
     except Exception as e:
         print("❌ 텔레그램 전송 실패 (CPI 예측):", e)
     return prediction
+
+def get_latest_cpi_direction():
+    """
+    최신 CPI 데이터를 불러와서 방향(hot/cool/inline)을 반환하는 함수
+    """
+    data = fetch_latest_cpi()
+    if not data:
+        return "neutral"
+    return estimate_next_direction({
+        "type": "CPI",
+        "value": data["actual"],
+        "forecast": data["expected"]
+    })
