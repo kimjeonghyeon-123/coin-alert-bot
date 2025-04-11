@@ -118,5 +118,16 @@ def check_realtime_entry_signal(is_pattern_allowed):
 def execute_entry(patterns, direction, entry_price, stop_loss, take_profit):
     print(f"[진입 실행] {', '.join(patterns) if patterns else '패턴 없음'} | {direction.upper()} | 진입가: {entry_price:.2f} | SL: {stop_loss:.2f} | TP: {take_profit:.2f}")
 
+def detect_chart_pattern(prices):
+    # 예시 로직: 가격이 저점을 두 번 찍으면 W-Pattern
+    if len(prices) < 10:
+        return None
+    if prices[-1] > prices[-3] < prices[-5] and prices[-3] > prices[-5]:
+        return "W-Pattern"
+    elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
+        return "M-Pattern"
+    return None
+
+
   
 
