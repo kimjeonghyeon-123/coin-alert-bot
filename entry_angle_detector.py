@@ -13,12 +13,6 @@ from utils import moving_average
 
 MIN_WIN_RATE_THRESHOLD = 0.70
 
-# 이동평균 계산
-def moving_average(data, period):
-    if len(data) < period:
-        return None
-    return sum(data[-period:]) / period
-
 # 추천 레버리지 계산
 def calculate_leverage(win_rate, stop_loss_pct):
     base_leverage = 1 if stop_loss_pct > 3 else 2
