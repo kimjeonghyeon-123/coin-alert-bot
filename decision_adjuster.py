@@ -82,11 +82,13 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
         if total > 5:
             winrate = d["success"] / total
             adjustment += (winrate - 0.5) * weights["direction"]
-
-    final_probability = max(0, min(1, base_probability + adjustment))
+        final_probability = max(0, min(1, base_probability + adjustment))
 
     # 추세 각도 반영
-    angle = analyze_trend_angle_and_inflection()(prices)
+    angle_info = analyze_trend_angle_and_inflection(prices)
+    angle = angle_info["angle"]
+    inflections = angle_info["inflection_points"]
+
     if direction == "long" and angle > 50:
         final_probability += weights["angle"]
     elif direction == "short" and angle < -50:
@@ -95,7 +97,6 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
         final_probability -= weights["angle"]
 
     # 꺾이는 지점 반영
-    inflections = detect_inflection_points(prices)
     if inflections and abs(len(prices) - 1 - inflections[-1]) <= 2:
         final_probability += weights["inflection"]
 
@@ -116,4 +117,5 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
                     final_probability += weights["event_low"] * weight_factor
 
     return max(0, min(1, final_probability)), ma5, ma20, ma60
+
 
