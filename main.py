@@ -64,5 +64,3 @@ while True:
                 print(f"[이벤트 감지] {event['summary']} - 영향도: {event['impact']}")
                 send_event_alert(event)
         t_last_event = now
-
-    time.sleep(1)
