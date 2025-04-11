@@ -21,3 +21,6 @@ def send_telegram_message(message):
         requests.post(url, data=payload)
     except Exception as e:
         print(f"[텔레그램 오류] {e}")
+
+def send_event_alert(message):
+    send_telegram_message(f"📢 이벤트 발생 알림:\n{message}")
