@@ -118,37 +118,5 @@ def check_realtime_entry_signal(is_pattern_allowed):
 def execute_entry(patterns, direction, entry_price, stop_loss, take_profit):
     print(f"[진입 실행] {', '.join(patterns) if patterns else '패턴 없음'} | {direction.upper()} | 진입가: {entry_price:.2f} | SL: {stop_loss:.2f} | TP: {take_profit:.2f}")
 
-def adjust_confidence(
-    base_confidence, detected_patterns, direction, trend, event_key
-):
-    # 추세 방향이 예상 방향과 일치할 때 신뢰도 증가
-    if trend == "up" and direction == "long":
-        base_confidence += 0.05
-    elif trend == "down" and direction == "short":
-        base_confidence += 0.05
-    else:
-        base_confidence -= 0.03
-
-    # 특정 패턴에 따라 신뢰도 조정
-    if detected_patterns:
-        for pattern in detected_patterns:
-            if pattern == "W-Pattern" and direction == "long":
-                base_confidence += 0.07
-            elif pattern == "M-Pattern" and direction == "short":
-                base_confidence += 0.07
-            else:
-                base_confidence -= 0.02
-
-    # 이벤트 영향 반영 (예: CPI 방향과 거래 방향이 일치하면 신뢰도 증가)
-    if event_key == "hot" and direction == "long":
-        base_confidence += 0.03
-    elif event_key == "cool" and direction == "short":
-        base_confidence += 0.03
-    elif event_key == "inline":
-        base_confidence += 0.01
-    else:
-        base_confidence -= 0.02
-
-    return max(0, min(1, base_confidence))
-
+  
 
