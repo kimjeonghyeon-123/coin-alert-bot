@@ -38,21 +38,24 @@ def check_realtime_entry_signal(is_pattern_allowed):
     if 'volume' in history[0]:  # volume 데이터가 있는지 확인
         volumes = [x['volume'] for x in history]  # 거래량 리스트 생성
         volume_factor = analyze_volume_behavior(volumes, prices)  # 거래량 분석하기
+        print("volume_factor:", volume_factor)  # 거래량 분석 결과 출력
     else:
+        volume_factor = 1  # 거래량 데이터가 없으면 기본값 1로 설정
         print("Volume data is missing in the history.")  # 거래량 데이터가 없으면 출력
-        volume_factor = 1  # 기본값
 
     # 변화율 및 속도
     change_rate = (prices[-1] - prices[-6]) / prices[-6] * 100
     time_diff = timestamps[-1] - timestamps[-6]
     if time_diff == 0:
         return
+
     speed = abs(prices[-1] - prices[-6]) / time_diff
 
     # 이동평균
     ma5 = moving_average(prices, 5)
     ma20 = moving_average(prices, 20)
     ma60 = moving_average(prices, 60)
+
     trend_score = 0
     if ma5 and ma20 and ma60:
         if ma5 > ma20 > ma60:
@@ -77,7 +80,6 @@ def check_realtime_entry_signal(is_pattern_allowed):
 
     # 이벤트 및 트렌드
     trend = get_current_trend(prices)  # prices를 인자로 전달
-
     event_key = get_latest_cpi_direction()
 
     # 보정된 확률 계산
