@@ -63,7 +63,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
     
     if patterns:
         for p in patterns:
-            if not is_pattern_allowed(p):
+            if not is_pattern_allowed():
                 print(f"[진입 차단] 신뢰되지 않은 패턴: {p}")
                 return
                 
