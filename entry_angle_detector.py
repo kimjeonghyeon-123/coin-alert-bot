@@ -32,7 +32,8 @@ def check_realtime_entry_signal(is_pattern_allowed):
         return
 
     prices = [x['price'] for x in history]
-    timestamps = [x['timestamp'] for x in history]
+    volumes = [x['volume'] for x in history]  # ⬅ 이거 추가!
+    volume_factor = analyze_volume_behavior(volumes, prices)  # ⬅ 고친 줄!
 
     # 변화율 및 속도
     change_rate = (prices[-1] - prices[-6]) / prices[-6] * 100
@@ -68,7 +69,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
                 return
                 
     # 거래량 영향 분석
-    volume_factor = analyze_volume_behavior()
+    volume_factor = analyze_volume_behavior(volumes, prices)  # threshold는 기본값 1.5 사용
 
     # 이벤트 및 트렌드
     trend = get_current_trend()
