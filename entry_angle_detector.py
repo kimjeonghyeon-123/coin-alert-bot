@@ -56,13 +56,17 @@ def check_realtime_entry_signal(is_pattern_allowed):
     direction, base_confidence = predict_direction(change_rate)
 
     # 패턴 감지
-    patterns = detect_chart_patterns()
+  patterns = []
+    pattern = detect_chart_pattern(prices)
+    if pattern:
+        patterns.append(pattern)
+    
     if patterns:
         for p in patterns:
             if not is_pattern_allowed(p):
                 print(f"[진입 차단] 신뢰되지 않은 패턴: {p}")
                 return
-
+                
     # 거래량 영향 분석
     volume_factor = analyze_volume_behavior()
 
