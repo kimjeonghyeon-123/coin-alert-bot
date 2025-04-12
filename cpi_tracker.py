@@ -19,22 +19,39 @@ def save_json(path, data):
 def load_json(path):
     if not os.path.exists(path):
         return {}
-    with open(path, "r") as f:
-        return json.load(f)
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print(f"❌ {path} 파일을 읽을 수 없습니다. JSON 형식이 잘못되었을 수 있습니다.")
+        return {}
+    except Exception as e:
+        print(f"❌ {path} 파일 로드 중 오류: {e}")
+        return {}
 
 def fetch_latest_cpi():
+    api_key = "4c660d85c6caa3480c4dd60c1e2fa823"  # 여기에 받은 API 키를 넣으세요.
+    url = f"https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key={api_key}&file_type=json"
+
     try:
-        response = requests.get("https://api.tradingeconomics.com/calendar/country/united-states?c=guest:guest")
+        response = requests.get(url)
+        response.raise_for_status()  # HTTP 상태 코드가 200이 아닐 경우 예외를 발생시킴
         data = response.json()
-        for event in data:
-            if event["category"] == "CPI" and event.get("actual") and event.get("forecast"):
+
+        if 'observations' in data and data['observations']:
+            # 가장 최근 CPI 값 가져오기
+            latest_observation = data['observations'][-1]
+            if 'value' in latest_observation:
                 return {
-                    "time": event["date"],
-                    "expected": float(event["forecast"]),
-                    "actual": float(event["actual"])
+                    "time": latest_observation['date'],
+                    "actual": float(latest_observation['value'])
                 }
+            else:
+                print("❌ CPI 데이터 값이 없음.")
+        else:
+            print("❌ CPI 데이터가 없음.")
     except Exception as e:
-        print("❌ CPI 데이터 수집 오류:", e)
+        print(f"❌ CPI 데이터 수집 오류: {e}")
     return None
 
 def is_already_logged(event_time):
@@ -88,11 +105,16 @@ def analyze_cpi_reaction(cpi_time_str, duration_min=60):
 def auto_process_cpi_event():
     cpi_data = fetch_latest_cpi()
     if not cpi_data:
+        print("❌ CPI 데이터 없음. 처리 중지.")
         return
 
     event_time = cpi_data["time"]
-    expected = cpi_data["expected"]
-    actual = cpi_data["actual"]
+    expected = cpi_data.get("expected")
+    actual = cpi_data.get("actual")
+
+    if expected is None or actual is None:
+        print("❌ 예상 CPI 값 또는 실제 CPI 값이 없음. 처리 중지.")
+        return
 
     # 이미 기록된 CPI인지 확인
     if is_already_logged(event_time):
@@ -115,7 +137,7 @@ def auto_process_cpi_event():
 *실제치:* {actual:.2f}
 *방향:* {direction.upper()}
 *가격 변화 추정:* {change:.2f}% ({estimated_duration}분 기준)
-        """)
+            """)
         except Exception as e:
             print("❌ 텔레그램 메시지 전송 실패:", e)
 
