@@ -31,9 +31,22 @@ def check_realtime_entry_signal(is_pattern_allowed):
     if len(history) < 10:
         return
 
-    prices = [x['price'] for x in history]
-    volumes = [x['volume'] for x in history]  # ⬅ 이거 추가!
-    volume_factor = analyze_volume_behavior(volumes, prices)  # ⬅ 고친 줄!
+    print("history:", history)  # history 전체를 출력
+    print("첫 번째 항목:", history[0])  # history의 첫 번째 항목을 출력
+
+    prices = [x['price'] for x in history]  # 가격 리스트 만들기
+    print("prices:", prices)  # 가격 리스트 출력
+    
+    # 거래량이 있을 경우 volumes 리스트 생성 및 거래량 분석
+    if 'volume' in history[0]:  # volume 데이터가 있는지 확인
+        volumes = [x['volume'] for x in history]  # 거래량 리스트 생성
+        volume_factor = analyze_volume_behavior(volumes, prices)  # 거래량 분석하기
+        print("volume_factor:", volume_factor)  # 거래량 분석 결과 출력
+    else:
+        print("Volume data is missing in the history.")  # 거래량 데이터가 없으면 출력
+
+    # 타임스탬프 리스트 생성
+    timestamps = [x['timestamp'] for x in history]  # timestamps 리스트 생성
 
     # 변화율 및 속도
     change_rate = (prices[-1] - prices[-6]) / prices[-6] * 100
@@ -67,9 +80,6 @@ def check_realtime_entry_signal(is_pattern_allowed):
             if not is_pattern_allowed():
                 print(f"[진입 차단] 신뢰되지 않은 패턴: {p}")
                 return
-                
-    # 거래량 영향 분석
-    volume_factor = analyze_volume_behavior(volumes, prices)  # threshold는 기본값 1.5 사용
 
     # 이벤트 및 트렌드
     trend = get_current_trend()
@@ -132,7 +142,3 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
-
-
-  
-
