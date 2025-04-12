@@ -50,7 +50,7 @@ while True:
         
         # 여기서 detect_chart_patterns 호출
         patterns = detect_chart_patterns(recent_events)  # 패턴 감지 추가
-        check_realtime_entry_signal(patterns, is_pattern_allowed)  # 수정된 부분
+        check_realtime_entry_signal(is_pattern_allowed)  # 수정된 부분
 
         t_last_entry = now
 
