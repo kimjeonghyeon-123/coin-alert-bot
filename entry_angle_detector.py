@@ -56,7 +56,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
     direction, base_confidence = predict_direction(change_rate)
 
     # 패턴 감지
-  patterns = []
+    patterns = []
     pattern = detect_chart_pattern(prices)
     if pattern:
         patterns.append(pattern)
