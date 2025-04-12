@@ -3,7 +3,7 @@ import time
 from keep_alive import keep_alive
 from simulator import run_simulation
 from price_logger import update_price
-from entry_angle_detector import check_realtime_entry_signal
+from entry_angle_detector import check_realtime_entry_signal, detect_chart_patterns  # 추가된 부분
 from config import MODE
 
 # ✅ 이벤트 감지 관련 import
@@ -47,7 +47,11 @@ while True:
     # 실시간 진입 각도 체크
     if now - t_last_entry >= ENTRY_SIGNAL_INTERVAL:
         recent_events = get_recent_events()
-        check_realtime_entry_signal(is_pattern_allowed)
+        
+        # 여기서 detect_chart_patterns 호출
+        patterns = detect_chart_patterns(recent_events)  # 패턴 감지 추가
+        check_realtime_entry_signal(patterns, is_pattern_allowed)  # 수정된 부분
+
         t_last_entry = now
 
     # 시뮬레이션 실행
