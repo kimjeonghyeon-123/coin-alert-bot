@@ -45,8 +45,10 @@ def check_realtime_entry_signal(is_pattern_allowed):
     else:
         print("Volume data is missing in the history.")  # 거래량 데이터가 없으면 출력
 
+    
     # 타임스탬프 리스트 생성
     timestamps = [x['timestamp'] for x in history]  # timestamps 리스트 생성
+
 
     # 변화율 및 속도
     change_rate = (prices[-1] - prices[-6]) / prices[-6] * 100
@@ -80,9 +82,13 @@ def check_realtime_entry_signal(is_pattern_allowed):
             if not is_pattern_allowed():
                 print(f"[진입 차단] 신뢰되지 않은 패턴: {p}")
                 return
+                
+    # 거래량 영향 분석
+    volume_factor = analyze_volume_behavior(volumes, prices)  # threshold는 기본값 1.5 사용
 
     # 이벤트 및 트렌드
-    trend = get_current_trend()
+    trend = get_current_trend(prices)  # 가격 리스트를 인자로 전달
+
     event_key = get_latest_cpi_direction()
 
     # 보정된 확률 계산
