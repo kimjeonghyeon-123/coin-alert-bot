@@ -6,7 +6,6 @@ from notifier import send_telegram_message
 from entry_angle_detector import detect_chart_pattern
 from decision_adjuster import calculate_probability
 
-
 def save_prediction(prediction):
     try:
         with open("prediction_log.json", "r") as f:
@@ -17,7 +16,6 @@ def save_prediction(prediction):
     history.append(prediction)
     with open("prediction_log.json", "w") as f:
         json.dump(history[-1000:], f, indent=2)
-
 
 def evaluate_predictions():
     try:
@@ -34,11 +32,10 @@ def evaluate_predictions():
             continue
 
         if now - p['timestamp'] >= 60 * 60 * 3:
-            future_prices = get_recent_prices(1)  # 가장 최근 가격 가져옴
+            future_prices = get_recent_prices(1)
             if not future_prices:
                 continue
             future_price = future_prices[-1]['price']
-            entry = p['entry']
             direction = p['direction']
             result = "success" if (
                 (direction == "long" and future_price >= p['take_profit']) or
@@ -50,7 +47,6 @@ def evaluate_predictions():
 
     with open("prediction_log.json", "w") as f:
         json.dump(updated_predictions[-1000:], f, indent=2)
-
 
 def update_learning_stats(prediction):
     try:
@@ -70,20 +66,18 @@ def update_learning_stats(prediction):
 
     update_weights_from_learning(stats)
 
-
 def update_weights_from_learning(stats):
     weights = {}
     for key, s in stats.items():
         total = s['success'] + s['fail']
         if total < 3:
-            weights[key] = 1.0  # 초기 가중치
+            weights[key] = 1.0
         else:
             success_rate = s['success'] / total
             weights[key] = round(0.5 + success_rate, 2)
 
     with open("weights.json", "w") as f:
         json.dump(weights, f, indent=2)
-
 
 def run_simulation(recent_events=None):
     evaluate_predictions()
@@ -93,6 +87,7 @@ def run_simulation(recent_events=None):
         return
 
     prices = [x['price'] for x in history]
+    volumes = [x.get('volume', 0) for x in history]
     timestamps = [x['timestamp'] for x in history]
     pattern = detect_chart_pattern(history)
     direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
@@ -101,7 +96,8 @@ def run_simulation(recent_events=None):
 
     win_rate, ma5, ma20, ma60 = calculate_probability(
         prices, timestamps, pattern, trend, direction,
-        events=recent_events, current_time=current_time
+        events=recent_events, current_time=current_time,
+        volumes=volumes
     )
 
     entry = prices[-1]
@@ -120,7 +116,6 @@ def run_simulation(recent_events=None):
 """
     send_telegram_message(message)
 
-    # 저장
     prediction = {
         "timestamp": current_time,
         "direction": direction,
@@ -133,13 +128,13 @@ def run_simulation(recent_events=None):
     }
     save_prediction(prediction)
 
-
 def simulate_entry(price_slice, current_price, simulate_mode=False, recent_events=None):
     if len(price_slice) < 20:
         return None
 
     prices = [float(x['close']) for x in price_slice]
     timestamps = [int(x['timestamp']) for x in price_slice]
+    volumes = [float(x.get('volume', 0)) for x in price_slice]
     pattern = detect_chart_pattern(price_slice)
     direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
     trend = None
@@ -147,7 +142,8 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
 
     win_rate, ma5, ma20, ma60 = calculate_probability(
         prices, timestamps, pattern, trend, direction,
-        events=recent_events, current_time=current_time
+        events=recent_events, current_time=current_time,
+        volumes=volumes
     )
 
     stop_loss = current_price * (0.98 if direction == "long" else 1.02)
@@ -181,4 +177,5 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
         json.dump(data[-500:], f, indent=2)
 
     return result
+
 
