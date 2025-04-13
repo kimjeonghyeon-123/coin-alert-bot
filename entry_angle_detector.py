@@ -13,7 +13,6 @@ from utils import moving_average
 
 MIN_WIN_RATE_THRESHOLD = 0.70
 
-# 추천 레버리지 계산
 def calculate_leverage(win_rate, stop_loss_pct):
     base_leverage = 1 if stop_loss_pct > 3 else 2
     if win_rate >= 0.99:
@@ -25,25 +24,23 @@ def calculate_leverage(win_rate, stop_loss_pct):
     else:
         return base_leverage
 
-# 진입각 분석 및 실시간 감지
 def check_realtime_entry_signal(is_pattern_allowed):
     history = get_recent_prices(60)
     if len(history) < 10:
         return
 
-    prices = [x['price'] for x in history]  # 가격 리스트 만들기
-    timestamps = [x['timestamp'] for x in history]  # 타임스탬프 리스트 생성
+    prices = [x['price'] for x in history]
+    timestamps = [x['timestamp'] for x in history]
 
-    # 거래량이 있을 경우 volumes 리스트 생성 및 거래량 분석
-    if 'volume' in history[0]:  # volume 데이터가 있는지 확인
-        volumes = [x['volume'] for x in history]  # 거래량 리스트 생성
-        volume_factor = analyze_volume_behavior(volumes, prices)  # 거래량 분석하기
-        print("volume_factor:", volume_factor)  # 거래량 분석 결과 출력
+    # 🔸 거래량 반영
+    if 'volume' in history[0]:
+        volumes = [x['volume'] for x in history]
+        volume_factor = analyze_volume_behavior(volumes, prices)
+        print("volume_factor:", volume_factor)
     else:
-        volume_factor = 1  # 거래량 데이터가 없으면 기본값 1로 설정
-        print("Volume data is missing in the history.")  # 거래량 데이터가 없으면 출력
+        volume_factor = 1
+        print("⚠️ 거래량 데이터 없음")
 
-    # 변화율 및 속도
     change_rate = (prices[-1] - prices[-6]) / prices[-6] * 100
     time_diff = timestamps[-1] - timestamps[-6]
     if time_diff == 0:
@@ -51,7 +48,6 @@ def check_realtime_entry_signal(is_pattern_allowed):
 
     speed = abs(prices[-1] - prices[-6]) / time_diff
 
-    # 이동평균
     ma5 = moving_average(prices, 5)
     ma20 = moving_average(prices, 20)
     ma60 = moving_average(prices, 60)
@@ -63,10 +59,8 @@ def check_realtime_entry_signal(is_pattern_allowed):
         elif ma5 < ma20 < ma60:
             trend_score -= 1
 
-    # 방향 예측
     direction, base_confidence = predict_direction(change_rate)
 
-    # 패턴 감지
     patterns = []
     pattern = detect_chart_pattern(prices)
     if pattern:
@@ -78,11 +72,10 @@ def check_realtime_entry_signal(is_pattern_allowed):
                 print(f"[진입 차단] 신뢰되지 않은 패턴: {p}")
                 return
 
-    # 이벤트 및 트렌드
-    trend = get_current_trend(prices)  # prices를 인자로 전달
+    trend = get_current_trend(prices)
     event_key = get_latest_cpi_direction()
 
-    # 보정된 확률 계산
+    # 🔸 볼륨 반영한 보정 확률 계산
     adjusted_confidence = adjust_confidence(
         base_confidence=base_confidence * volume_factor,
         detected_patterns=patterns,
@@ -91,7 +84,6 @@ def check_realtime_entry_signal(is_pattern_allowed):
         event_key=event_key
     )
 
-    # 기준 넘으면 알림
     if adjusted_confidence >= MIN_WIN_RATE_THRESHOLD:
         current_price = get_current_price()
         stop_loss = current_price * 0.985 if direction == "long" else current_price * 1.015
@@ -99,14 +91,12 @@ def check_realtime_entry_signal(is_pattern_allowed):
         stop_loss_pct = abs(current_price - stop_loss) / current_price * 100
         leverage = calculate_leverage(adjusted_confidence, stop_loss_pct)
 
-        # CPI 상세 설명
         cpi_reason = ""
         if event_key:
             cpi_info = estimate_cpi_impact(event_key)
             if cpi_info["known"]:
                 cpi_reason = f"\n*CPI 근거:* '{event_key}'은 과거 평균 {cpi_info['average_change_percent']}%, 상승 확률 {cpi_info['positive_rate_percent']}% → '{cpi_info['bias']}' 경향"
 
-        # 강력 신호 구분
         signal_strength = "🔥 강력 신호" if adjusted_confidence >= 0.90 else "✅ 추천 신호"
 
         message = f"""{signal_strength} *실시간 진입각 탐지!*  
@@ -126,12 +116,10 @@ def check_realtime_entry_signal(is_pattern_allowed):
 
         execute_entry(patterns, direction, current_price, stop_loss, take_profit)
 
-# 진입 실행 함수
 def execute_entry(patterns, direction, entry_price, stop_loss, take_profit):
     print(f"[진입 실행] {', '.join(patterns) if patterns else '패턴 없음'} | {direction.upper()} | 진입가: {entry_price:.2f} | SL: {stop_loss:.2f} | TP: {take_profit:.2f}")
 
 def detect_chart_pattern(prices):
-    # 예시 로직: 가격이 저점을 두 번 찍으면 W-Pattern
     if len(prices) < 10:
         return None
     if prices[-1] > prices[-3] < prices[-5] and prices[-3] > prices[-5]:
@@ -139,3 +127,4 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
+
