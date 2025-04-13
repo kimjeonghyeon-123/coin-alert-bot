@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta
 import requests
 
-from price_fetcher import get_current_price
+from price_fetcher import get_price_and_volume
 from learning_updater import update_learning_data_from_event
 from event_impact_estimator import estimate_next_direction, estimate_impact_duration
 from notifier import send_telegram_message
@@ -12,9 +12,11 @@ from notifier import send_telegram_message
 CPI_EVENT_LOG = "cpi_event_log.json"
 BTC_PRICE_LOG = "btc_price_log.json"
 
+
 def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
+
 
 def load_json(path):
     if not os.path.exists(path):
@@ -29,17 +31,17 @@ def load_json(path):
         print(f"❌ {path} 파일 로드 중 오류: {e}")
         return {}
 
+
 def fetch_latest_cpi():
     api_key = "4c660d85c6caa3480c4dd60c1e2fa823"  # 여기에 받은 API 키를 넣으세요.
     url = f"https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key={api_key}&file_type=json"
 
     try:
         response = requests.get(url)
-        response.raise_for_status()  # HTTP 상태 코드가 200이 아닐 경우 예외를 발생시킴
+        response.raise_for_status()
         data = response.json()
 
         if 'observations' in data and data['observations']:
-            # 가장 최근 CPI 값 가져오기
             latest_observation = data['observations'][-1]
             if 'value' in latest_observation:
                 return {
@@ -54,14 +56,16 @@ def fetch_latest_cpi():
         print(f"❌ CPI 데이터 수집 오류: {e}")
     return None
 
+
 def is_already_logged(event_time):
     log = load_json(CPI_EVENT_LOG)
     return any(entry["event_time"] == event_time for entry in log.values())
 
+
 def log_cpi_event(event_time, expected_cpi, actual_cpi):
     diff = actual_cpi - expected_cpi
     direction = "hot" if diff > 0 else "cool" if diff < 0 else "inline"
-    entry_price = get_current_price()
+    entry_price, entry_volume = get_price_and_volume()
     timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
     log = load_json(CPI_EVENT_LOG)
@@ -71,12 +75,14 @@ def log_cpi_event(event_time, expected_cpi, actual_cpi):
         "actual_cpi": actual_cpi,
         "diff": diff,
         "direction": direction,
-        "btc_price_at_announcement": entry_price
+        "btc_price_at_announcement": entry_price,
+        "volume_at_announcement": entry_volume
     }
     save_json(CPI_EVENT_LOG, log)
-    print(f"[✅ CPI 기록됨] 예상: {expected_cpi} / 실제: {actual_cpi} / BTC: {entry_price}")
+    print(f"[✅ CPI 기록됨] 예상: {expected_cpi} / 실제: {actual_cpi} / BTC: {entry_price} / 거래량: {entry_volume}")
 
     return direction, timestamp
+
 
 def analyze_cpi_reaction(cpi_time_str, duration_min=60):
     price_log = load_json(BTC_PRICE_LOG)
@@ -95,12 +101,16 @@ def analyze_cpi_reaction(cpi_time_str, duration_min=60):
         print("📭 해당 시간대 가격 데이터 없음.")
         return None
 
-    start_price = prices[0][1]
-    end_price = prices[-1][1]
+    start_price = prices[0][1][0]  # 가격
+    end_price = prices[-1][1][0]
+    start_volume = prices[0][1][1]  # 거래량
+    avg_volume = sum([p[1][1] for p in prices]) / len(prices)
+
     change_percent = ((end_price - start_price) / start_price) * 100
 
-    print(f"📊 CPI 반응 분석: {duration_min}분 동안 {change_percent:.2f}% 변화")
+    print(f"📊 CPI 반응 분석: {duration_min}분 동안 {change_percent:.2f}% 변화 / 평균 거래량: {avg_volume:.2f}")
     return change_percent
+
 
 def auto_process_cpi_event():
     cpi_data = fetch_latest_cpi()
@@ -116,7 +126,6 @@ def auto_process_cpi_event():
         print("❌ 예상 CPI 값 또는 실제 CPI 값이 없음. 처리 중지.")
         return
 
-    # 이미 기록된 CPI인지 확인
     if is_already_logged(event_time):
         print("⚠️ 이미 기록된 CPI 이벤트입니다. 무시합니다.")
         return
@@ -141,7 +150,7 @@ def auto_process_cpi_event():
         except Exception as e:
             print("❌ 텔레그램 메시지 전송 실패:", e)
 
-# 향후 CPI 예측 요청 시 호출
+
 def predict_next_cpi_reaction():
     prediction = estimate_next_direction("CPI")
     try:
@@ -150,10 +159,8 @@ def predict_next_cpi_reaction():
         print("❌ 텔레그램 전송 실패 (CPI 예측):", e)
     return prediction
 
+
 def get_latest_cpi_direction():
-    """
-    최신 CPI 데이터를 불러와서 방향(hot/cool/inline)을 반환하는 함수
-    """
     data = fetch_latest_cpi()
     if not data:
         return "neutral"
