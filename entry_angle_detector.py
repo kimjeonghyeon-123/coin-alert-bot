@@ -59,7 +59,8 @@ def check_realtime_entry_signal(is_pattern_allowed):
         elif ma5 < ma20 < ma60:
             trend_score -= 1
 
-    direction, base_confidence = predict_direction(change_rate)
+    # 🔹 거래량 기반 보정 인자 추가
+    direction, base_confidence = predict_direction(change_rate, volume_factor)
 
     patterns = []
     pattern = detect_chart_pattern(prices)
@@ -77,7 +78,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
 
     # 🔸 볼륨 반영한 보정 확률 계산
     adjusted_confidence = adjust_confidence(
-        base_confidence=base_confidence * volume_factor,
+        base_confidence=base_confidence,
         detected_patterns=patterns,
         direction=direction,
         trend=trend,
@@ -127,4 +128,3 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
-
