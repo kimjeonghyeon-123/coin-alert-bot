@@ -38,6 +38,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
         volume_factor = analyze_volume_behavior(volumes, prices)
         print("volume_factor:", volume_factor)
     else:
+        volumes = None
         volume_factor = 1
         print("⚠️ 거래량 데이터 없음")
 
@@ -73,7 +74,8 @@ def check_realtime_entry_signal(is_pattern_allowed):
                 print(f"[진입 차단] 신뢰되지 않은 패턴: {p}")
                 return
 
-    trend = get_current_trend(prices)
+    # 🔹 거래량을 고려한 추세 판단
+    trend = get_current_trend(prices, volumes)
     event_key = get_latest_cpi_direction()
 
     # 🔸 볼륨 반영한 보정 확률 계산
