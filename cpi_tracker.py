@@ -163,9 +163,19 @@ def predict_next_cpi_reaction():
 def get_latest_cpi_direction():
     data = fetch_latest_cpi()
     if not data:
+        print("[CPI] 최신 CPI 데이터를 가져오지 못했습니다.")
         return "neutral"
+    
+    actual = data.get("actual")
+    expected = data.get("expected")
+
+    if actual is None or expected is None:
+        print(f"[CPI 경고] 누락된 데이터 있음. actual: {actual}, expected: {expected}, 원시 데이터: {data}")
+        return "neutral"
+
     return estimate_next_direction({
         "type": "CPI",
-        "value": data["actual"],
-        "forecast": data["expected"]
+        "value": actual,
+        "forecast": expected
     })
+
