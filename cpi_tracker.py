@@ -6,7 +6,7 @@ from price_fetcher import get_price_and_volume
 from learning_updater import update_learning_data_from_event
 from event_impact_estimator import estimate_next_direction, estimate_impact_duration
 from notifier import send_telegram_message
-from multi_country_cpi_fetcher import fetch_latest_cpis
+from multi_country_cpi_fetcher import fetch_latest_cpis  # ✅ 다국가 CPI fetcher
 
 CPI_EVENT_LOG = "cpi_event_log.json"
 BTC_PRICE_LOG = "btc_price_log.json"
@@ -33,7 +33,7 @@ def load_json(path):
 
 def is_already_logged(country, event_time):
     log = load_json(CPI_EVENT_LOG)
-    return any(entry["event_time"] == event_time and entry["country"] == country for entry in log.values())
+    return any(entry["country"] == country and entry["event_time"] == event_time for entry in log.values())
 
 
 def log_cpi_event(country, event_time, expected_cpi, actual_cpi):
@@ -78,6 +78,7 @@ def analyze_cpi_reaction(cpi_time_str, duration_min=60):
 
     start_price = prices[0][1][0]  # 가격
     end_price = prices[-1][1][0]
+    start_volume = prices[0][1][1]  # 거래량
     avg_volume = sum([p[1][1] for p in prices]) / len(prices)
 
     change_percent = ((end_price - start_price) / start_price) * 100
@@ -86,23 +87,24 @@ def analyze_cpi_reaction(cpi_time_str, duration_min=60):
     return change_percent
 
 
-def auto_process_all_cpi_events():
-    cpi_data_list = fetch_latest_cpis()
-    if not cpi_data_list:
+def auto_process_cpi_events():
+    cpi_list = fetch_latest_cpis()
+    if not cpi_list:
         print("❌ CPI 데이터 없음. 처리 중지.")
         return
 
-    for country, cpi_data in cpi_data_list.items():
-        event_time = cpi_data.get("time")
-        expected = cpi_data.get("expected")
-        actual = cpi_data.get("actual")
+    for item in cpi_list:
+        country = item["country"]
+        event_time = item["time"]
+        expected = item.get("expected")
+        actual = item.get("actual")
 
-        if not all([event_time, expected, actual]):
-            print(f"❌ {country} CPI 정보 누락. 건너뜀.")
+        if expected is None or actual is None:
+            print(f"❌ {country} 예상 또는 실제 CPI 없음. 스킵.")
             continue
 
         if is_already_logged(country, event_time):
-            print(f"⚠️ {country} CPI 이미 기록됨. 무시함.")
+            print(f"⚠️ {country} CPI 이미 기록됨. 무시.")
             continue
 
         direction, ts = log_cpi_event(country, event_time, expected, actual)
@@ -111,7 +113,7 @@ def auto_process_all_cpi_events():
 
         if change is not None:
             update_learning_data_from_event("CPI", direction, change)
-            print("🧠 학습 반영 완료")
+            print(f"🧠 {country} CPI 학습 반영 완료")
 
             try:
                 send_telegram_message(f"""📈 *{country} CPI 발표 감지됨!*
@@ -123,33 +125,31 @@ def auto_process_all_cpi_events():
 *가격 변화 추정:* {change:.2f}% ({estimated_duration}분 기준)
                 """)
             except Exception as e:
-                print(f"❌ 텔레그램 메시지 전송 실패 ({country}):", e)
+                print(f"❌ 텔레그램 메시지 전송 실패 ({country} CPI):", e)
 
 
-def predict_next_cpi_reaction():
+def predict_next_cpi_reaction(country="United States"):
     prediction = estimate_next_direction("CPI")
     try:
-        send_telegram_message(f"🔮 *다음 CPI 발표 예상 방향:* {prediction.upper()}")
+        send_telegram_message(f"🔮 *다음 {country} CPI 발표 예상 방향:* {prediction.upper()}")
     except Exception as e:
-        print("❌ 텔레그램 전송 실패 (CPI 예측):", e)
+        print(f"❌ 텔레그램 전송 실패 (CPI 예측):", e)
     return prediction
 
 
-def get_latest_cpi_direction():
-    cpis = fetch_latest_cpis()
-    if "USA" not in cpis:
-        print("[CPI] 미국 CPI 데이터가 없음.")
-        return "neutral"
-
-    actual = cpis["USA"].get("actual")
-    expected = cpis["USA"].get("expected")
-
-    if actual is None or expected is None:
-        print(f"[CPI 경고] 누락된 데이터 있음. actual: {actual}, expected: {expected}")
-        return "neutral"
-
-    return estimate_next_direction({
-        "type": "CPI",
-        "value": actual,
-        "forecast": expected
-    })
+def get_latest_cpi_direction(country="United States"):
+    cpi_list = fetch_latest_cpis()
+    for item in cpi_list:
+        if item["country"] == country:
+            actual = item.get("actual")
+            expected = item.get("expected")
+            if actual is None or expected is None:
+                print(f"[CPI 경고] {country} 데이터 누락됨.")
+                return "neutral"
+            return estimate_next_direction({
+                "type": "CPI",
+                "value": actual,
+                "forecast": expected
+            })
+    print(f"[CPI] {country} CPI 데이터 없음.")
+    return "neutral"
