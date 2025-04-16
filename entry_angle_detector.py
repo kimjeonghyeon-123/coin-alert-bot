@@ -2,8 +2,8 @@ import time
 from notifier import send_telegram_message
 from price_logger import get_recent_prices
 from price_fetcher import get_current_price
-from cpi_tracker import get_latest_cpi_direction
-from event_impact_estimator import estimate_cpi_impact
+from cpi_tracker import get_latest_all_cpi_directions
+from event_impact_estimator import estimate_cpi_impact_for_all
 from chart_pattern_detector import detect_chart_patterns
 from volume_analyzer import analyze_volume_behavior
 from trend_detector import get_current_trend
@@ -76,15 +76,17 @@ def check_realtime_entry_signal(is_pattern_allowed):
 
     # 🔹 거래량을 고려한 추세 판단
     trend = get_current_trend(prices, volumes)
-    event_key = get_latest_cpi_direction()
 
-    # 🔸 볼륨 반영한 보정 확률 계산
+    # ✅ 다국가 CPI 이벤트 키 가져오기
+    event_keys = get_latest_all_cpi_directions()
+
+    # ✅ 다국가 CPI 이벤트 기반 확률 보정
     adjusted_confidence = adjust_confidence(
         base_confidence=base_confidence,
         detected_patterns=patterns,
         direction=direction,
         trend=trend,
-        event_key=event_key
+        event_keys=event_keys  # 리스트 전달
     )
 
     if adjusted_confidence >= MIN_WIN_RATE_THRESHOLD:
@@ -94,11 +96,17 @@ def check_realtime_entry_signal(is_pattern_allowed):
         stop_loss_pct = abs(current_price - stop_loss) / current_price * 100
         leverage = calculate_leverage(adjusted_confidence, stop_loss_pct)
 
+        # ✅ 다국가 CPI 근거 메시지 구성
         cpi_reason = ""
-        if event_key:
-            cpi_info = estimate_cpi_impact(event_key)
-            if cpi_info["known"]:
-                cpi_reason = f"\n*CPI 근거:* '{event_key}'은 과거 평균 {cpi_info['average_change_percent']}%, 상승 확률 {cpi_info['positive_rate_percent']}% → '{cpi_info['bias']}' 경향"
+        if event_keys:
+            cpi_infos = estimate_cpi_impact_for_all(event_keys)
+            lines = []
+            for key, info in cpi_infos.items():
+                if info["known"]:
+                    line = f"→ {key}: 평균 {info['average_change_percent']}%, 상승 확률 {info['positive_rate_percent']}% → *{info['bias']}*"
+                    lines.append(line)
+            if lines:
+                cpi_reason = "\n*CPI 근거:*\n" + "\n".join(lines)
 
         signal_strength = "🔥 강력 신호" if adjusted_confidence >= 0.90 else "✅ 추천 신호"
 
