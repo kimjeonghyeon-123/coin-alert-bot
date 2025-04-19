@@ -2,14 +2,16 @@ import json
 import os
 import time
 from datetime import datetime
-from weight_optimizer import optimize_weights  # 자동 가중치 최적화 모듈 불러오기
+from weight_optimizer import optimize_weights  # 자동 가중치 최적화 모듈
 
 STATS_FILE = "learning_stats.json"
 RESULT_LOG = "simulation_results.json"
 CPI_LOG = "cpi_event_log.json"
 COUNT_FILE = "update_count.txt"
-UPDATE_INTERVAL = 60  # 초 단위 자동 업데이트 주기
-OPTIMIZE_TRIGGER = 20  # 최적화 실행을 위한 누적 학습 수
+UPDATE_INTERVAL = 60  # 자동 업데이트 주기 (초)
+OPTIMIZE_TRIGGER = 20  # 최적화 트리거 조건 (누적 학습 수)
+
+# ---------------- 기본 유틸 ----------------
 
 def load_json(path):
     if not os.path.exists(path):
@@ -37,6 +39,8 @@ def update_category(stats, category, key, success):
         stats[category][key] = {"success": 0, "fail": 0}
     stats[category][key]["success" if success else "fail"] += 1
 
+# ---------------- CPI 학습 ----------------
+
 def update_cpi_learning():
     stats = load_json(STATS_FILE)
     cpi_logs = load_json(CPI_LOG)
@@ -55,7 +59,7 @@ def update_cpi_learning():
         after_price = cpi_event.get("btc_price_after_duration")
 
         if after_price is None:
-            continue  # 아직 가격 변화가 기록되지 않음
+            continue  # 아직 가격 변화 미기록
 
         change_percent = ((after_price - before_price) / before_price) * 100
 
@@ -87,6 +91,8 @@ def update_cpi_learning():
         print("📊 CPI 학습 데이터 업데이트 완료")
 
     return updated
+
+# ---------------- 시뮬레이션 결과 학습 ----------------
 
 def update_simulation_results():
     stats = load_json(STATS_FILE)
@@ -150,11 +156,10 @@ def update_simulation_results():
         print("⏸️ 시뮬레이션에 학습할 새 데이터 없음.")
 
     return updated
-    
+
+# ---------------- 개별 이벤트 학습 기록 ----------------
+
 def update_learning_data_from_event(event_id, result):
-    """
-    개별 이벤트 결과(success/fail)를 기록하고 일정 횟수 도달 시 가중치 최적화를 트리거합니다.
-    """
     stats = load_json(STATS_FILE)
 
     if "events" not in stats:
@@ -178,6 +183,7 @@ def update_learning_data_from_event(event_id, result):
         optimize_weights()
         save_count(0)
 
+# ---------------- 메인 루프 ----------------
 
 if __name__ == "__main__":
     print("🔁 자동 학습 시스템 가동 중...")
@@ -197,3 +203,4 @@ if __name__ == "__main__":
                 save_count(0)
 
         time.sleep(UPDATE_INTERVAL)
+
