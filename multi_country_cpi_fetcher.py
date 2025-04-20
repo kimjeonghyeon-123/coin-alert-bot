@@ -82,4 +82,12 @@ def log_all_country_cpi():
 if __name__ == "__main__":
     log_all_country_cpi()
 
+def fetch_latest_cpis():
+    """모든 국가의 최신 CPI 데이터를 리스트로 반환"""
+    results = []
+    for country in COUNTRY_CPI_CODES:
+        cpi = fetch_latest_cpi_from_dbnomics(country)
+        if cpi:
+            results.append(cpi)
+    return results
 
