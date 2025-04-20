@@ -70,9 +70,42 @@ def estimate_impact_duration(event):
 
     return 3600  # 기본값
 
+def estimate_cpi_impact_for_all(cpi_list):
+    """
+    entry_angle_detector.py에서 사용하는 함수.
+    cpi_list = [{country, actual, expected, time}]
+    return 예시: {'United States': {'direction': 'hot', 'duration': 3600}, ...}
+    """
+    result = {}
+    for item in cpi_list:
+        country = item.get("country")
+        actual = item.get("actual")
+        expected = item.get("expected")
+
+        if not country or actual is None or expected is None:
+            continue
+
+        direction = estimate_next_direction({
+            "type": "CPI",
+            "value": actual,
+            "forecast": expected
+        })
+        duration = estimate_impact_duration({
+            "type": "CPI",
+            "source": country
+        })
+
+        result[country] = {
+            "direction": direction,
+            "duration": duration
+        }
+
+    return result
+
 # 예시 실행
 if __name__ == "__main__":
     for d in ["hot", "cool", "inline"]:
         result = estimate_cpi_impact(d)
         print(f"[📊 {d.upper()} 예측] {result['message']}")
+
 
