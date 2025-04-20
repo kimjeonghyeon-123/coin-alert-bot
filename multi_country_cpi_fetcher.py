@@ -79,9 +79,6 @@ def log_all_country_cpi():
     save_json(CPI_EVENT_LOG, log)
 
 
-if __name__ == "__main__":
-    log_all_country_cpi()
-
 def fetch_latest_cpis():
     """모든 국가의 최신 CPI 데이터를 리스트로 반환"""
     results = []
@@ -90,4 +87,15 @@ def fetch_latest_cpis():
         if cpi:
             results.append(cpi)
     return results
+
+
+# ✅ 오류 수정: main.py에서 import하는 함수 정의
+def auto_process_all_countries():
+    """fetch_latest_cpis()를 호출해 main.py와 연결"""
+    return fetch_latest_cpis()
+
+
+if __name__ == "__main__":
+    log_all_country_cpi()
+
 
