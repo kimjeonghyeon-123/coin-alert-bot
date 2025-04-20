@@ -11,9 +11,11 @@ from multi_country_cpi_fetcher import fetch_latest_cpis  # ✅ 다국가 CPI fet
 CPI_EVENT_LOG = "cpi_event_log.json"
 BTC_PRICE_LOG = "btc_price_log.json"
 
+
 def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
+
 
 def load_json(path):
     if not os.path.exists(path):
@@ -28,9 +30,11 @@ def load_json(path):
         print(f"❌ {path} 파일 로드 중 오류: {e}")
         return {}
 
+
 def is_already_logged(country, event_time):
     log = load_json(CPI_EVENT_LOG)
     return any(entry["country"] == country and entry["event_time"] == event_time for entry in log.values())
+
 
 def log_cpi_event(country, event_time, expected_cpi, actual_cpi):
     diff = actual_cpi - expected_cpi
@@ -54,6 +58,7 @@ def log_cpi_event(country, event_time, expected_cpi, actual_cpi):
 
     return direction, timestamp
 
+
 def analyze_cpi_reaction(cpi_time_str, duration_min=60):
     price_log = load_json(BTC_PRICE_LOG)
     cpi_time = datetime.strptime(cpi_time_str, "%Y-%m-%d %H:%M:%S")
@@ -71,15 +76,16 @@ def analyze_cpi_reaction(cpi_time_str, duration_min=60):
         print("📭 해당 시간대 가격 데이터 없음.")
         return None
 
-    start_price = prices[0][1][0]  # 가격
+    start_price = prices[0][1][0]
     end_price = prices[-1][1][0]
-    start_volume = prices[0][1][1]  # 거래량
+    start_volume = prices[0][1][1]
     avg_volume = sum([p[1][1] for p in prices]) / len(prices)
 
     change_percent = ((end_price - start_price) / start_price) * 100
 
     print(f"📊 CPI 반응 분석: {duration_min}분 동안 {change_percent:.2f}% 변화 / 평균 거래량: {avg_volume:.2f}")
     return change_percent
+
 
 def auto_process_cpi_events():
     cpi_list = fetch_latest_cpis()
@@ -125,6 +131,7 @@ def auto_process_cpi_events():
             except Exception as e:
                 print(f"❌ 텔레그램 메시지 전송 실패 ({country} CPI):", e)
 
+
 def predict_next_cpi_reaction(country="United States"):
     prediction = estimate_next_direction("CPI")
     try:
@@ -132,6 +139,7 @@ def predict_next_cpi_reaction(country="United States"):
     except Exception as e:
         print(f"❌ 텔레그램 전송 실패 (CPI 예측):", e)
     return prediction
+
 
 def get_latest_cpi_direction(country="United States"):
     try:
@@ -153,4 +161,32 @@ def get_latest_cpi_direction(country="United States"):
     except Exception as e:
         print(f"[CPI 오류] {country} 방향 추정 실패: {e}")
         return "neutral"
+
+
+# ✅ entry_angle_detector 등에서 import해 사용하는 함수
+def get_latest_all_cpi_directions():
+    result = {}
+    cpis = fetch_latest_cpis()
+    log = load_json(CPI_EVENT_LOG)
+
+    for cpi in cpis:
+        country = cpi["country"]
+        time = cpi["time"]
+        actual = cpi["actual"]
+
+        year, month = map(int, time.split("-"))
+        prev_period = f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
+        prev_data = log.get(prev_period, {}).get(country)
+
+        if prev_data:
+            prev_actual = prev_data.get("actual")
+            if prev_actual is not None:
+                result[country] = "up" if actual > prev_actual else "down"
+            else:
+                result[country] = "unknown"
+        else:
+            result[country] = "unknown"
+
+    return result
+
 
