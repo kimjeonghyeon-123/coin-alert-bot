@@ -1,18 +1,13 @@
-# 🔄 Multi-country CPI 자동 수집 + 업데이트
-
 import json
 import os
 import requests
 from datetime import datetime
 
-# ✅ DBnomics 기반 CPI API (Eurostat - HICP 기준)
+# ✅ 현재 DBnomics API에서 정상 작동 확인된 국가만 유지
 COUNTRY_CPI_CODES = {
     "USA": "USA.A.HICP.CPI.IX.CP00.N._Z",
-    "KOR": "KOR.A.HICP.CPI.IX.CP00.N._Z",
-    "JPN": "JPN.A.HICP.CPI.IX.CP00.N._Z",
     "DEU": "DEU.A.HICP.CPI.IX.CP00.N._Z",
-    "FRA": "FRA.A.HICP.CPI.IX.CP00.N._Z",
-    "GBR": "GBR.A.HICP.CPI.IX.CP00.N._Z"
+    "FRA": "FRA.A.HICP.CPI.IX.CP00.N._Z"
 }
 
 CPI_EVENT_LOG = "cpi_event_log.json"
@@ -28,14 +23,15 @@ def fetch_latest_cpi_from_dbnomics(country_code):
         data = response.json()
         observations = data["series"]["docs"][0]["periods"]
 
-        # 마지막 데이터
+        # 최신 키로부터 날짜와 수치 추출
         latest_period = sorted(observations.keys())[-1]
         latest_value = float(observations[latest_period])
 
         return {
             "country": country_code,
             "time": latest_period,
-            "actual": latest_value
+            "actual": latest_value,
+            "expected": None  # 현재는 예상치 없음
         }
     except Exception as e:
         print(f"❌ {country_code} CPI 수집 실패: {e}")
@@ -89,13 +85,13 @@ def fetch_latest_cpis():
     return results
 
 
-# ✅ 오류 수정: main.py에서 import하는 함수 정의
 def auto_process_all_countries():
-    """fetch_latest_cpis()를 호출해 main.py와 연결"""
+    """main.py와 연결되는 외부용 진입 함수"""
     return fetch_latest_cpis()
 
 
 if __name__ == "__main__":
     log_all_country_cpi()
+
 
 
