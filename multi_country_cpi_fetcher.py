@@ -3,11 +3,9 @@ import os
 import requests
 from datetime import datetime
 
-# ✅ 현재 DBnomics API에서 정상 작동 확인된 국가만 유지
+# ✅ 미국 CPI 코드만 유지
 COUNTRY_CPI_CODES = {
-    "USA": "USA.A.HICP.CPI.IX.CP00.N._Z",
-    "DEU": "DEU.A.HICP.CPI.IX.CP00.N._Z",
-    "FRA": "FRA.A.HICP.CPI.IX.CP00.N._Z"
+    "USA": "USA.A.HICP.CPI.IX.CP00.N._Z"
 }
 
 CPI_EVENT_LOG = "cpi_event_log.json"
@@ -23,7 +21,7 @@ def fetch_latest_cpi_from_dbnomics(country_code):
         data = response.json()
         observations = data["series"]["docs"][0]["periods"]
 
-        # 최신 키로부터 날짜와 수치 추출
+        # 최신 데이터 추출
         latest_period = sorted(observations.keys())[-1]
         latest_value = float(observations[latest_period])
 
@@ -31,7 +29,7 @@ def fetch_latest_cpi_from_dbnomics(country_code):
             "country": country_code,
             "time": latest_period,
             "actual": latest_value,
-            "expected": None  # 현재는 예상치 없음
+            "expected": None  # 예상치는 별도 연동
         }
     except Exception as e:
         print(f"❌ {country_code} CPI 수집 실패: {e}")
@@ -76,7 +74,7 @@ def log_all_country_cpi():
 
 
 def fetch_latest_cpis():
-    """모든 국가의 최신 CPI 데이터를 리스트로 반환"""
+    """미국 CPI 최신값 리스트로 반환"""
     results = []
     for country in COUNTRY_CPI_CODES:
         cpi = fetch_latest_cpi_from_dbnomics(country)
@@ -86,12 +84,13 @@ def fetch_latest_cpis():
 
 
 def auto_process_all_countries():
-    """main.py와 연결되는 외부용 진입 함수"""
+    """main.py에서 연결용 진입 함수"""
     return fetch_latest_cpis()
 
 
 if __name__ == "__main__":
     log_all_country_cpi()
+
 
 
 
