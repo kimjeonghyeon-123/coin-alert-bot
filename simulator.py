@@ -179,3 +179,4 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
     return result
 
 
+
