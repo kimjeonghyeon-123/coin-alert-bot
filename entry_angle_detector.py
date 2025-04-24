@@ -63,6 +63,10 @@ def check_realtime_entry_signal(is_pattern_allowed):
     # 🔹 거래량 기반 보정 인자 추가
     direction, base_confidence = predict_direction(change_rate, volume_factor)
 
+    # 🔸 변화율이 +2% 이상일 때 long 방향 가중치 추가
+    if change_rate >= 2 and direction == "long":
+        base_confidence += 0.05
+
     patterns = []
     pattern = detect_chart_pattern(prices)
     if pattern:
@@ -138,3 +142,4 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
+
