@@ -117,3 +117,4 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
 
 
+
