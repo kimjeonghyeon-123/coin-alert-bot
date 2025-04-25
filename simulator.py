@@ -1,3 +1,7 @@
+
+
+
+
 import time
 import json
 import os
@@ -8,24 +12,25 @@ from decision_adjuster import calculate_probability
 
 def save_prediction(prediction):
     try:
-        with open("prediction_log.json", "r") as f:
+        with open("prediction_log.json", "r", encoding="utf-8") as f:
             history = json.load(f)
-    except:
+    except (FileNotFoundError, json.JSONDecodeError):
         history = []
 
     history.append(prediction)
-    with open("prediction_log.json", "w") as f:
-        json.dump(history[-1000:], f, indent=2)
+    with open("prediction_log.json", "w", encoding="utf-8") as f:
+        json.dump(history[-1000:], f, indent=2, ensure_ascii=False)
 
 def evaluate_predictions():
     try:
-        with open("prediction_log.json", "r") as f:
+        with open("prediction_log.json", "r", encoding="utf-8") as f:
             predictions = json.load(f)
-    except:
+    except (FileNotFoundError, json.JSONDecodeError):
         return
 
     now = int(time.time())
     updated_predictions = []
+
     for p in predictions:
         if 'result' in p:
             updated_predictions.append(p)
@@ -43,26 +48,25 @@ def evaluate_predictions():
             ) else "fail"
             p['result'] = result
             update_learning_stats(p)
+
         updated_predictions.append(p)
 
-    with open("prediction_log.json", "w") as f:
-        json.dump(updated_predictions[-1000:], f, indent=2)
+    with open("prediction_log.json", "w", encoding="utf-8") as f:
+        json.dump(updated_predictions[-1000:], f, indent=2, ensure_ascii=False)
 
 def update_learning_stats(prediction):
     try:
-        with open("learning_stats.json", "r") as f:
+        with open("learning_stats.json", "r", encoding="utf-8") as f:
             stats = json.load(f)
-    except:
+    except (FileNotFoundError, json.JSONDecodeError):
         stats = {}
 
-    key = prediction['pattern'] or 'none'
-    if key not in stats:
-        stats[key] = {"success": 0, "fail": 0}
-
+    key = prediction.get('pattern') or 'none'
+    stats.setdefault(key, {"success": 0, "fail": 0})
     stats[key][prediction['result']] += 1
 
-    with open("learning_stats.json", "w") as f:
-        json.dump(stats, f, indent=2)
+    with open("learning_stats.json", "w", encoding="utf-8") as f:
+        json.dump(stats, f, indent=2, ensure_ascii=False)
 
     update_weights_from_learning(stats)
 
@@ -70,18 +74,14 @@ def update_weights_from_learning(stats):
     weights = {}
     for key, s in stats.items():
         total = s['success'] + s['fail']
-        if total < 3:
-            weights[key] = 1.0
-        else:
-            success_rate = s['success'] / total
-            weights[key] = round(0.5 + success_rate, 2)
+        success_rate = s['success'] / total if total > 0 else 0
+        weights[key] = round(0.5 + success_rate, 2) if total >= 3 else 1.0
 
-    with open("weights.json", "w") as f:
-        json.dump(weights, f, indent=2)
+    with open("weights.json", "w", encoding="utf-8") as f:
+        json.dump(weights, f, indent=2, ensure_ascii=False)
 
 def run_simulation(recent_events=None):
     evaluate_predictions()
-
     history = get_recent_prices(120)
     if len(history) < 20:
         return
@@ -90,7 +90,7 @@ def run_simulation(recent_events=None):
     volumes = [x.get('volume', 0) for x in history]
     timestamps = [x['timestamp'] for x in history]
     pattern = detect_chart_pattern(history)
-    direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
+    direction = "long" if prices[-1] > prices[-12] else "short"
     trend = None
     current_time = int(time.time())
 
@@ -136,7 +136,7 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
     timestamps = [int(x['timestamp']) for x in price_slice]
     volumes = [float(x.get('volume', 0)) for x in price_slice]
     pattern = detect_chart_pattern(price_slice)
-    direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
+    direction = "long" if prices[-1] > prices[-12] else "short"
     trend = None
     current_time = int(time.time())
 
@@ -167,16 +167,13 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
         print("🔍 시뮬레이션 (simulate_mode=True):", result)
 
     try:
-        with open("simulation_results.json", "r") as f:
+        with open("simulation_results.json", "r", encoding="utf-8") as f:
             data = json.load(f)
-    except:
+    except (FileNotFoundError, json.JSONDecodeError):
         data = []
 
     data.append(result)
-    with open("simulation_results.json", "w") as f:
-        json.dump(data[-500:], f, indent=2)
+    with open("simulation_results.json", "w", encoding="utf-8") as f:
+        json.dump(data[-500:], f, indent=2, ensure_ascii=False)
 
     return result
-
-
-
