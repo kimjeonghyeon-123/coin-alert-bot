@@ -1,11 +1,14 @@
+from utils import moving_average, load_learning_stats, load_weights
+from trend_angle_analyzer import analyze_trend_angle_and_inflection  # 수정된 모듈 이름
+
 def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None, volume_factor=1):
     weights = load_weights()
     stats = load_learning_stats()
 
     # ░░ 가격 변화율 계산 ░░
-    change_rate_5m = (prices[-1] - prices[-2]) / prices[-2] * 100      # 5분
-    change_rate_30m = (prices[-1] - prices[-6]) / prices[-6] * 100     # 30분
-    change_rate_60m = (prices[-1] - prices[-12]) / prices[-12] * 100   # 60분
+    change_rate_5m = (prices[-1] - prices[-2]) / prices[-2] * 100
+    change_rate_30m = (prices[-1] - prices[-6]) / prices[-6] * 100
+    change_rate_60m = (prices[-1] - prices[-12]) / prices[-12] * 100
 
     # 기존 change_rate와 speed 유지
     change_rate = change_rate_60m
@@ -37,7 +40,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     if direction == "long" and change_rate_5m > 2:
         base_probability += 0.05
 
-    # 학습 기반 가중치 조정
+    # ░░ 학습 기반 가중치 보정 ░░
     adjustment = 0
     if pattern and pattern in stats.get("patterns", {}):
         p = stats["patterns"][pattern]
@@ -74,7 +77,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     # ░░ 변화율이 클수록 inflection 가능성 → angle 보정 가중치 증폭 ░░
     angle_weight = weights["angle"]
     if abs(change_rate_5m) > 2:
-        angle_weight *= 1.5  # 변화율이 높을수록 angle의 영향 증가
+        angle_weight *= 1.5
 
     if direction == "long" and angle > 50:
         final_probability += angle_weight
@@ -83,11 +86,11 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     elif abs(angle) < 20:
         final_probability -= angle_weight
 
-    # inflection 지점에서 가까우면 추가 보정
+    # ░░ inflection 지점 인접 여부 보정 ░░
     if inflections and abs(len(prices) - 1 - inflections[-1]) <= 2:
         final_probability += weights["inflection"]
 
-    # ░░ 거래량 + 변화율 동시 급등 시 추가 가중치 ░░
+    # ░░ 거래량 + 변화율 급등 시 추가 가중치 ░░
     if volume_factor > 1.2 and abs(change_rate_5m) > 2:
         final_probability += 0.03
 
@@ -108,6 +111,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
                     final_probability += weights["event_low"] * weight_factor
 
     return max(0, min(1, final_probability)), ma5, ma20, ma60
+
 
 
 
