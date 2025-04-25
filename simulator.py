@@ -8,25 +8,24 @@ from decision_adjuster import calculate_probability
 
 def save_prediction(prediction):
     try:
-        with open("prediction_log.json", "r", encoding="utf-8") as f:
+        with open("prediction_log.json", "r") as f:
             history = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except:
         history = []
 
     history.append(prediction)
-    with open("prediction_log.json", "w", encoding="utf-8") as f:
-        json.dump(history[-1000:], f, indent=2, ensure_ascii=False)
+    with open("prediction_log.json", "w") as f:
+        json.dump(history[-1000:], f, indent=2)
 
 def evaluate_predictions():
     try:
-        with open("prediction_log.json", "r", encoding="utf-8") as f:
+        with open("prediction_log.json", "r") as f:
             predictions = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except:
         return
 
     now = int(time.time())
     updated_predictions = []
-
     for p in predictions:
         if 'result' in p:
             updated_predictions.append(p)
@@ -45,24 +44,38 @@ def evaluate_predictions():
             p['result'] = result
             update_learning_stats(p)
 
+            # 텔레그램 메시지 전송 (예측 결과)
+            result_msg = f"""✅ *[3시간 전 예측 결과]*
+
+*방향:* {direction}
+*예측가:* {p['entry']:.2f}
+*익절가:* {p['take_profit']:.2f}
+*실제가격:* {future_price:.2f}
+*결과:* {"🎯 성공!" if result == "success" else "❌ 실패"}
+"""
+            time.sleep(60)  # 예측 메시지 이후 1분 대기
+            send_telegram_message(result_msg)
+
         updated_predictions.append(p)
 
-    with open("prediction_log.json", "w", encoding="utf-8") as f:
-        json.dump(updated_predictions[-1000:], f, indent=2, ensure_ascii=False)
+    with open("prediction_log.json", "w") as f:
+        json.dump(updated_predictions[-1000:], f, indent=2)
 
 def update_learning_stats(prediction):
     try:
-        with open("learning_stats.json", "r", encoding="utf-8") as f:
+        with open("learning_stats.json", "r") as f:
             stats = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except:
         stats = {}
 
-    key = prediction.get('pattern') or 'none'
-    stats.setdefault(key, {"success": 0, "fail": 0})
+    key = prediction['pattern'] or 'none'
+    if key not in stats:
+        stats[key] = {"success": 0, "fail": 0}
+
     stats[key][prediction['result']] += 1
 
-    with open("learning_stats.json", "w", encoding="utf-8") as f:
-        json.dump(stats, f, indent=2, ensure_ascii=False)
+    with open("learning_stats.json", "w") as f:
+        json.dump(stats, f, indent=2)
 
     update_weights_from_learning(stats)
 
@@ -70,14 +83,18 @@ def update_weights_from_learning(stats):
     weights = {}
     for key, s in stats.items():
         total = s['success'] + s['fail']
-        success_rate = s['success'] / total if total > 0 else 0
-        weights[key] = round(0.5 + success_rate, 2) if total >= 3 else 1.0
+        if total < 3:
+            weights[key] = 1.0
+        else:
+            success_rate = s['success'] / total
+            weights[key] = round(0.5 + success_rate, 2)
 
-    with open("weights.json", "w", encoding="utf-8") as f:
-        json.dump(weights, f, indent=2, ensure_ascii=False)
+    with open("weights.json", "w") as f:
+        json.dump(weights, f, indent=2)
 
 def run_simulation(recent_events=None):
     evaluate_predictions()
+
     history = get_recent_prices(120)
     if len(history) < 20:
         return
@@ -86,7 +103,7 @@ def run_simulation(recent_events=None):
     volumes = [x.get('volume', 0) for x in history]
     timestamps = [x['timestamp'] for x in history]
     pattern = detect_chart_pattern(history)
-    direction = "long" if prices[-1] > prices[-12] else "short"
+    direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
     trend = None
     current_time = int(time.time())
 
@@ -132,7 +149,7 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
     timestamps = [int(x['timestamp']) for x in price_slice]
     volumes = [float(x.get('volume', 0)) for x in price_slice]
     pattern = detect_chart_pattern(price_slice)
-    direction = "long" if prices[-1] > prices[-12] else "short"
+    direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
     trend = None
     current_time = int(time.time())
 
@@ -163,13 +180,14 @@ def simulate_entry(price_slice, current_price, simulate_mode=False, recent_event
         print("🔍 시뮬레이션 (simulate_mode=True):", result)
 
     try:
-        with open("simulation_results.json", "r", encoding="utf-8") as f:
+        with open("simulation_results.json", "r") as f:
             data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except:
         data = []
 
     data.append(result)
-    with open("simulation_results.json", "w", encoding="utf-8") as f:
-        json.dump(data[-500:], f, indent=2, ensure_ascii=False)
+    with open("simulation_results.json", "w") as f:
+        json.dump(data[-500:], f, indent=2)
 
     return result
+
