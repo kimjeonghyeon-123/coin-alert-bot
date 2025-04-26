@@ -34,10 +34,10 @@ def save_count(count):
     with open(COUNT_FILE, "w") as f:
         f.write(str(count))
 
-def update_category(stats, category, key, success):
+def update_category(stats, category, key, success, risk_weight=1.0):
     if key not in stats[category]:
         stats[category][key] = {"success": 0, "fail": 0}
-    stats[category][key]["success" if success else "fail"] += 1
+    stats[category][key]["success" if success else "fail"] += risk_weight
 
 # ---------------- CPI 학습 ----------------
 
@@ -130,11 +130,13 @@ def update_simulation_results():
         elif direction == "short":
             success = result_price <= take_profit
 
+        risk_weight = r.get("risk_weight", 1.0)  # risk_weight 추가
+
         if pattern:
-            update_category(stats, "patterns", pattern, success)
+            update_category(stats, "patterns", pattern, success, risk_weight)
         if trend:
-            update_category(stats, "trend", trend, success)
-        update_category(stats, "direction", direction, success)
+            update_category(stats, "trend", trend, success, risk_weight)
+        update_category(stats, "direction", direction, success, risk_weight)
 
         if event:
             ekey = event.get("type", "") + "_" + event.get("source", "")
@@ -159,7 +161,7 @@ def update_simulation_results():
 
 # ---------------- 개별 이벤트 학습 기록 ----------------
 
-def update_learning_data_from_event(event_id, result):
+def update_learning_data_from_event(event_id, result, risk_weight=1.0):
     stats = load_json(STATS_FILE)
 
     if "events" not in stats:
@@ -169,9 +171,9 @@ def update_learning_data_from_event(event_id, result):
         stats["events"][event_id] = {"success": 0, "fail": 0}
 
     if result == "success":
-        stats["events"][event_id]["success"] += 1
+        stats["events"][event_id]["success"] += risk_weight
     elif result == "fail":
-        stats["events"][event_id]["fail"] += 1
+        stats["events"][event_id]["fail"] += risk_weight
 
     save_json(STATS_FILE, stats)
 
@@ -203,4 +205,5 @@ if __name__ == "__main__":
                 save_count(0)
 
         time.sleep(UPDATE_INTERVAL)
+
 
