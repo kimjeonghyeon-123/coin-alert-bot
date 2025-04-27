@@ -39,6 +39,32 @@ def update_category(stats, category, key, success, risk_weight=1.0):
         stats[category][key] = {"success": 0, "fail": 0}
     stats[category][key]["success" if success else "fail"] += risk_weight
 
+# ---------------- 공통 학습 업데이트 ----------------
+
+def update_learning_stats(event_type, identifier, success, risk_weight=1.0):
+    """
+    학습 통계를 업데이트하는 공통 함수
+    event_type: "patterns", "trend", "direction", "events" 등
+    identifier: 패턴 이름, 트렌드 이름, 방향 이름, 이벤트 ID 등
+    success: 성공 여부 (True/False)
+    risk_weight: 리스크 가중치 (기본값 1.0)
+    """
+    stats = load_json(STATS_FILE)
+
+    if event_type not in stats:
+        stats[event_type] = {}
+
+    update_category(stats, event_type, identifier, success, risk_weight)
+    save_json(STATS_FILE, stats)
+
+    count = load_count() + 1
+    save_count(count)
+
+    if count >= OPTIMIZE_TRIGGER:
+        print("🎯 최적화 조건 충족! 가중치 최적화 실행...")
+        optimize_weights()
+        save_count(0)
+
 # ---------------- CPI 학습 ----------------
 
 def update_cpi_learning():
@@ -95,18 +121,7 @@ def update_cpi_learning():
 # ---------------- 시뮬레이션 결과 학습 ----------------
 
 def update_simulation_results():
-    stats = load_json(STATS_FILE)
     results = load_json(RESULT_LOG)
-
-    if "patterns" not in stats:
-        stats["patterns"] = {}
-    if "direction" not in stats:
-        stats["direction"] = {}
-    if "trend" not in stats:
-        stats["trend"] = {}
-    if "event_durations" not in stats:
-        stats["event_durations"] = {}
-
     updated = False
     new_results = []
 
@@ -118,11 +133,12 @@ def update_simulation_results():
         direction = r["direction"]
         pattern = r["pattern"]
         trend = r.get("trend")
+        result_price = r["result_price"]
         entry_price = r["entry_price"]
         stop_loss = r["stop_loss"]
         take_profit = r["take_profit"]
-        result_price = r["result_price"]
         event = r.get("event")
+        risk_weight = r.get("risk_weight", 1.0)
 
         success = False
         if direction == "long":
@@ -130,28 +146,30 @@ def update_simulation_results():
         elif direction == "short":
             success = result_price <= take_profit
 
-        risk_weight = r.get("risk_weight", 1.0)  # risk_weight 추가
-
+        # 개별 항목별 학습 업데이트
         if pattern:
-            update_category(stats, "patterns", pattern, success, risk_weight)
+            update_learning_stats("patterns", pattern, success, risk_weight)
         if trend:
-            update_category(stats, "trend", trend, success, risk_weight)
-        update_category(stats, "direction", direction, success, risk_weight)
+            update_learning_stats("trend", trend, success, risk_weight)
+        update_learning_stats("direction", direction, success, risk_weight)
 
         if event:
             ekey = event.get("type", "") + "_" + event.get("source", "")
-            duration = event.get("duration", 3600)
+            stats = load_json(STATS_FILE)
+            if "event_durations" not in stats:
+                stats["event_durations"] = {}
             if ekey not in stats["event_durations"]:
                 stats["event_durations"][ekey] = {"total": 0, "count": 0}
+            duration = event.get("duration", 3600)
             stats["event_durations"][ekey]["total"] += duration
             stats["event_durations"][ekey]["count"] += 1
+            save_json(STATS_FILE, stats)
 
         r["evaluated"] = True
         new_results.append(r)
         updated = True
 
     if updated:
-        save_json(STATS_FILE, stats)
         save_json(RESULT_LOG, {"logs": new_results})
         print("📈 시뮬레이션 결과 학습 완료")
     else:
@@ -159,31 +177,11 @@ def update_simulation_results():
 
     return updated
 
-# ---------------- 개별 이벤트 학습 기록 ----------------
+# ---------------- 개별 이벤트 학습 ----------------
 
 def update_learning_data_from_event(event_id, result, risk_weight=1.0):
-    stats = load_json(STATS_FILE)
-
-    if "events" not in stats:
-        stats["events"] = {}
-
-    if event_id not in stats["events"]:
-        stats["events"][event_id] = {"success": 0, "fail": 0}
-
-    if result == "success":
-        stats["events"][event_id]["success"] += risk_weight
-    elif result == "fail":
-        stats["events"][event_id]["fail"] += risk_weight
-
-    save_json(STATS_FILE, stats)
-
-    count = load_count() + 1
-    save_count(count)
-
-    if count >= OPTIMIZE_TRIGGER:
-        print("🎯 이벤트 기반 학습도 최적화 조건 충족!")
-        optimize_weights()
-        save_count(0)
+    success = (result == "success")
+    update_learning_stats("events", event_id, success, risk_weight)
 
 # ---------------- 메인 루프 ----------------
 
@@ -195,15 +193,9 @@ if __name__ == "__main__":
         cpi_updated = update_cpi_learning()
 
         if sim_updated or cpi_updated:
-            count = load_count() + 1
-            save_count(count)
-            print(f"🔄 학습 카운터: {count}")
-
-            if count >= OPTIMIZE_TRIGGER:
-                print("🎯 최적화 조건 충족, 가중치 자동 조정 시작...")
-                optimize_weights()
-                save_count(0)
+            print("🔄 학습 데이터 업데이트 완료")
 
         time.sleep(UPDATE_INTERVAL)
+
 
 
