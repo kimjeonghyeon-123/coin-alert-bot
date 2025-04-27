@@ -76,3 +76,4 @@ while True:
         auto_process_all_countries()
         t_last_cpi = now
 
+
