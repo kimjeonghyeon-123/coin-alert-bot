@@ -10,5 +10,6 @@ COPY . .
 # 필요 패키지 설치
 RUN pip install --no-cache-dir -r requirements.txt
 
-# main.py 또는 너의 시작 파일이 무엇이든 지정 (예: scheduler.py?)
-CMD ["python", "scheduler.py"]
+# 시작 파일 지정 (main.py)
+CMD ["python", "main.py"]
+
