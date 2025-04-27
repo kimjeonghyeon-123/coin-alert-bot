@@ -6,14 +6,14 @@ from price_logger import update_price
 from entry_angle_detector import check_realtime_entry_signal, detect_chart_patterns
 from config import MODE
 
-# ✅ 이벤트 감지 관련 import
+# ✅ 이벤트 감지
 from event_monitor import check_new_events, get_recent_events
 from notifier import send_event_alert
 
 # ✅ 다국가 CPI 자동 처리
-from multi_country_cpi_fetcher import auto_process_all_countries  # 새로 추가된 import
+from multi_country_cpi_fetcher import auto_process_all_countries
 
-# trusted_patterns 적용
+# 패턴 필터링
 if MODE == "real":
     from trusted_patterns import TRUSTED_PATTERNS
 else:
@@ -29,14 +29,14 @@ PRICE_LOG_INTERVAL = 60
 ENTRY_SIGNAL_INTERVAL = 30
 SIMULATION_INTERVAL = 10800  # 3시간
 EVENT_CHECK_INTERVAL = 60
-CPI_PROCESS_INTERVAL = 3600  # 1시간마다 다국가 CPI 체크
+CPI_PROCESS_INTERVAL = 3600  # 1시간
 
 # 타이머 초기화
 t_last_price = time.time()
 t_last_entry = time.time()
 t_last_sim = time.time() - SIMULATION_INTERVAL + 5
 t_last_event = time.time() - EVENT_CHECK_INTERVAL + 3
-t_last_cpi = time.time() - CPI_PROCESS_INTERVAL + 10  # 바로 시작
+t_last_cpi = time.time() - CPI_PROCESS_INTERVAL + 10
 
 keep_alive()
 print("[시스템 시작] Bitcoin 실시간 모니터링 중...")
@@ -49,17 +49,14 @@ while True:
         update_price()
         t_last_price = now
 
-    # 실시간 진입 각도 체크
+    # 실시간 진입 신호 체크
     if now - t_last_entry >= ENTRY_SIGNAL_INTERVAL:
         recent_events = get_recent_events()
-
-        # 패턴 감지 및 진입 신호 판단
-        patterns = detect_chart_patterns(recent_events)
+        detect_chart_patterns(recent_events)
         check_realtime_entry_signal(is_pattern_allowed)
-
         t_last_entry = now
 
-    # 시뮬레이션 실행
+    # 시뮬레이션 + 자동 학습
     if now - t_last_sim >= SIMULATION_INTERVAL:
         recent_events = get_recent_events()
         run_simulation(recent_events=recent_events)
@@ -74,7 +71,8 @@ while True:
                 send_event_alert(event)
         t_last_event = now
 
-    # ✅ 다국가 CPI 자동 처리
+    # 다국가 CPI 처리
     if now - t_last_cpi >= CPI_PROCESS_INTERVAL:
         auto_process_all_countries()
         t_last_cpi = now
+
