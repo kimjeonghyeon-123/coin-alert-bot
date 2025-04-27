@@ -31,7 +31,7 @@ def save_prediction(prediction: Dict[str, Any]):
     history = load_json(PREDICTION_LOG_FILE, [])
     history.append(prediction)
     save_json(PREDICTION_LOG_FILE, history, limit=1000)
-    update_learning_stats(prediction)  # ✅ 예측 저장할 때 바로 학습 반영
+    update_learning_stats(prediction)
 
 def evaluate_predictions():
     predictions = load_json(PREDICTION_LOG_FILE, [])
@@ -59,7 +59,6 @@ def evaluate_predictions():
             p['result'] = result
             update_learning_stats(p)
 
-            # 텔레그램 메시지 전송
             result_msg = f"""✅ *[3시간 전 예측 결과]*
 
 *방향:* {direction}
@@ -146,7 +145,7 @@ def run_simulation(recent_events: Optional[List[Dict[str, Any]]] = None):
         "pattern": pattern,
         "trend": trend,
         "win_rate": win_rate,
-        "result": None  # 예측 단계에서는 아직 결과가 없음
+        "result": None
     }
     save_prediction(prediction)
 
@@ -193,8 +192,9 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     data.append(result)
     save_json(SIMULATION_RESULTS_FILE, data, limit=500)
 
-    save_prediction(result)  # ✅ 시뮬레이션도 예측/학습에 자동 반영
+    save_prediction(result)
 
     return result
+
 
 
