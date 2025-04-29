@@ -36,7 +36,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
     if 'volume' in history[0]:
         volumes = [x['volume'] for x in history]
         volume_factor = analyze_volume_behavior(volumes, prices)
-        print("volume_factor:", volume_factor)
+        print(f"volume_factor: {volume_factor}")
     else:
         volumes = None
         volume_factor = 1
@@ -90,7 +90,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
         detected_patterns=patterns,
         direction=direction,
         trend=trend,
-        event_keys=event_keys  # 리스트 전달
+        event_keys=event_keys
     )
 
     if adjusted_confidence >= MIN_WIN_RATE_THRESHOLD:
@@ -142,4 +142,3 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
-
