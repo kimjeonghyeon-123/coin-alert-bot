@@ -2,10 +2,17 @@ from utils import moving_average, load_learning_stats, load_weights
 from trend_angle_analyzer import analyze_trend_angle_and_inflection
 import math
 
-def adjust_confidence(confidence, volume_factor, volatility_factor=1.0, event_influence=0.0):
+def adjust_confidence(entry_info, simulation_result):
     """
-    패턴 신뢰도(confidence)를 시장 상황에 맞게 조정하는 함수
+    entry_info와 simulation_result를 바탕으로 confidence 값을 조정하는 호환 함수
+    (기존 entry_angle_detector.py 등과 호환)
     """
+    confidence = entry_info.get("confidence", 0.5)
+    volume_factor = entry_info.get("volume_factor", 1.0)
+    event_influence = entry_info.get("event_influence", 0.0)
+    volatility_factor = entry_info.get("volatility_factor", 1.0)
+    risk_weight = entry_info.get("risk_weight", 1.0)
+
     # 거래량이 높을 때 신뢰도 증가
     if volume_factor > 1.2:
         confidence += 0.03
@@ -14,13 +21,19 @@ def adjust_confidence(confidence, volume_factor, volatility_factor=1.0, event_in
     if volatility_factor < 0.8:
         confidence -= 0.03
 
-    # 최근 이벤트 영향이 크면 신뢰도 추가 증가
+    # 이벤트 영향이 크면 추가 상승
     if event_influence > 0.5:
         confidence += 0.02
 
-    # 0~1 범위로 제한
+    # 위험도 가중치 적용
+    confidence *= risk_weight
+
+    # 범위 제한
     confidence = max(0, min(1, confidence))
-    return confidence
+
+    # Logistic smoothing
+    smoothed_confidence = 1 / (1 + math.exp(-12 * (confidence - 0.5)))
+    return smoothed_confidence
 
 def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None, volume_factor=1, risk_weight=1.0):
     weights = load_weights()
@@ -103,10 +116,6 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
                 elif impact == "low":
                     event_influence += weights["event_low"] * weight_factor
 
-    # ░░ adjust_confidence 적용 (2차 보정) ░░
-    volatility_factor = 1.0  # 변동성 파라미터 추후 확장 가능
-    adjusted_probability = adjust_confidence(adjusted_probability, volume_factor, volatility_factor, event_influence)
-
     # ░░ 추세 각도 및 inflection 분석 ░░
     angle_info = analyze_trend_angle_and_inflection(prices)
     angle = angle_info["angle"]
@@ -132,17 +141,18 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     if volume_factor > 1.2 and abs(change_rate_5m) > 2:
         adjusted_probability += 0.03
 
-    # ░░ 위험도 가중치 반영 ░░
-    adjusted_probability *= risk_weight
+    # ░░ adjust_confidence 적용 (2차 보정) ░░
+    entry_info = {
+        "confidence": adjusted_probability,
+        "volume_factor": volume_factor,
+        "event_influence": event_influence,
+        "volatility_factor": 1.0,  # 확장 가능
+        "risk_weight": risk_weight
+    }
 
-    # ░░ 최종 승률 범위 제한 ░░
-    adjusted_probability = max(0, min(1, adjusted_probability))
-
-    # ░░ logistic 보정 (최종 부드럽게) ░░
-    final_probability = 1 / (1 + math.exp(-12 * (adjusted_probability - 0.5)))
-    final_probability = max(0, min(1, final_probability))
-
+    final_probability = adjust_confidence(entry_info, simulation_result={})
     return final_probability, ma5, ma20, ma60
+
 
 
 
