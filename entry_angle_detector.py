@@ -80,13 +80,11 @@ def check_realtime_entry_signal(is_pattern_allowed):
     # 🔹 양 방향 보정 확률 계산 (오류 수정된 부분)
     adjusted = {
         direction: adjust_confidence(
-            {
-                "confidence": conf["confidence"],
-                "detected_patterns": patterns,
-                "direction": direction,
-                "trend": trend,
-                "event_keys": event_keys
-            },
+            confidence=conf["confidence"],
+            detected_patterns=patterns,
+            direction=direction,
+            trend=trend,
+            event_keys=event_keys,
             simulation_result={}
         )
         for direction, conf in base_confidences.items()
@@ -145,6 +143,7 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
+
 
 
 
