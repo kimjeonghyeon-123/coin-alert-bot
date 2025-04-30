@@ -8,7 +8,7 @@ from chart_pattern_detector import detect_chart_patterns
 from volume_analyzer import analyze_volume_behavior
 from trend_detector import get_current_trend
 from decision_adjuster import adjust_confidence
-from direction_predictor import predict_both_directions  # ✅ 수정 필요
+from direction_predictor import predict_both_directions
 from utils import moving_average
 
 MIN_WIN_RATE_THRESHOLD = 0.70
@@ -77,14 +77,17 @@ def check_realtime_entry_signal(is_pattern_allowed):
     trend = get_current_trend(prices, volumes)
     event_keys = get_latest_all_cpi_directions()
 
-    # 🔹 양 방향 보정 확률 계산
+    # 🔹 양 방향 보정 확률 계산 (오류 수정된 부분)
     adjusted = {
         direction: adjust_confidence(
-            base_confidence=conf["confidence"],
-            detected_patterns=patterns,
-            direction=direction,
-            trend=trend,
-            event_keys=event_keys
+            {
+                "confidence": conf["confidence"],
+                "detected_patterns": patterns,
+                "direction": direction,
+                "trend": trend,
+                "event_keys": event_keys
+            },
+            simulation_result={}
         )
         for direction, conf in base_confidences.items()
     }
@@ -142,5 +145,6 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
+
 
 
