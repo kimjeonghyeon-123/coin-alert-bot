@@ -11,6 +11,11 @@ def update_price():
         price, volume = get_price_and_volume()
         timestamp = int(time.time())
 
+        # 거래량이 None일 경우 0으로 대체
+        if volume is None:
+            print("[⚠️ 경고] 거래량이 None으로 반환되었습니다. 0으로 대체합니다.")
+            volume = 0
+
         record = {
             "timestamp": timestamp,
             "price": price,
@@ -43,3 +48,4 @@ def get_recent_prices(n=30):
     with open(price_log_file, "r") as f:
         history = json.load(f)
     return history[-n:]
+
