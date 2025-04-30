@@ -153,14 +153,3 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = adjust_confidence(entry_info, simulation_result={})
     return final_probability, ma5, ma20, ma60
-
-
-
-
-
-
-
-
-
-
-
