@@ -54,6 +54,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     # ░░ 추세 분석 ░░
     trend_score = 0
+    # 이동평균 값이 정상적으로 계산되었다면
     if ma5 and ma20 and ma60:
         if ma5 > ma20 > ma60:
             trend_score += 1
@@ -152,6 +153,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = adjust_confidence(entry_info, simulation_result={})
     return final_probability, ma5, ma20, ma60
+
 
 
 
