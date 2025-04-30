@@ -9,7 +9,7 @@ def home():
     return "✅ BTC Trading Bot is alive and running!"
 
 def run():
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 10001))
     app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
