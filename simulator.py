@@ -106,7 +106,7 @@ def run_simulation(recent_events: Optional[List[Dict[str, Any]]] = None):
     if len(history) < 20:
         return
 
-    prices = [x.get('price', 0) for x in history]
+    prices = [x.get('price') for x in history if isinstance(x.get('price'), (int, float))]
     volumes = [x.get('volume', 0) for x in history]
     timestamps = [x.get('timestamp', 0) for x in history]
 
@@ -157,9 +157,17 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     if len(price_slice) < 20:
         return None
 
-    prices = [float(x.get('close', 0)) for x in price_slice]
-    timestamps = [int(x.get('timestamp', 0)) for x in price_slice]
-    volumes = [float(x.get('volume', 0)) for x in price_slice]
+    prices = []
+    volumes = []
+    timestamps = []
+
+    for x in price_slice:
+        try:
+            prices.append(float(x.get('close')))
+            volumes.append(float(x.get('volume', 0)))
+            timestamps.append(int(x.get('timestamp', 0)))
+        except (TypeError, ValueError):
+            continue
 
     if len(prices) < 12:
         return None
@@ -203,6 +211,7 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     save_prediction(result)
 
     return result
+
 
 
 
