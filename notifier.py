@@ -2,8 +2,8 @@
 import os
 import requests
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+TELEGRAM_BOT_TOKEN = os.environ.get("7570517160:AAHA_GAEzdeY69K7n57Da5QfBRUfgsVbXZQ")
+TELEGRAM_CHAT_ID = os.environ.get("7738545441")
 
 
 def send_telegram_message(message):
