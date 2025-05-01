@@ -21,20 +21,20 @@ def adjust_confidence(entry_info, simulation_result):
     smoothed_confidence = 1 / (1 + math.exp(-12 * (confidence - 0.5)))
     return smoothed_confidence
 
+def extract_ma_value(ma):
+    return ma.get("value", 0) if isinstance(ma, dict) else ma
+
 def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None, volume_factor=1, risk_weight=1.0):
     weights = load_weights() or {}
     stats = load_learning_stats() or {}
 
-    # dict 키가 없거나 None인 경우 안전하게 초기화
     stats.setdefault("patterns", {})
     stats.setdefault("trend", {})
     stats.setdefault("direction", {})
 
-    # ░░ [1] prices가 dict일 경우 숫자만 추출 ░░
     if isinstance(prices[0], dict):
         prices = [p.get("price", 0) for p in prices]
 
-    # ░░ [2] 가격 변화율 및 속도 계산 ░░
     change_rate_5m = (prices[-1] - prices[-2]) / prices[-2] * 100
     change_rate_30m = (prices[-1] - prices[-6]) / prices[-6] * 100
     change_rate_60m = (prices[-1] - prices[-12]) / prices[-12] * 100
@@ -42,12 +42,10 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     change_rate = change_rate_60m
     speed = abs(prices[-1] - prices[-12]) / (timestamps[-1] - timestamps[-12])
 
-    # ░░ [3] 이동 평균 계산 ░░
-    ma5 = moving_average(prices, 5)
-    ma20 = moving_average(prices, 20)
-    ma60 = moving_average(prices, 60)
+    ma5 = extract_ma_value(moving_average(prices, 5))
+    ma20 = extract_ma_value(moving_average(prices, 20))
+    ma60 = extract_ma_value(moving_average(prices, 60))
 
-    # ░░ [4] 추세 분석 ░░
     trend_score = 0
     if all(isinstance(ma, (int, float)) for ma in [ma5, ma20, ma60]):
         if ma5 > ma20 > ma60:
@@ -57,17 +55,14 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
             trend_score -= 1
             trend = "down"
 
-    # ░░ [5] 패턴 점수 ░░
     pattern_score = 0.2 if pattern == "W-Pattern" else -0.2 if pattern == "M-Pattern" else 0
 
-    # ░░ [6] 초기 승률 ░░
     base_probability = 0.5 + (change_rate / 10) + (trend_score * 0.2) + pattern_score
     base_probability = max(0, min(1, base_probability))
 
     if direction == "long" and change_rate_5m > 2:
         base_probability += 0.05
 
-    # ░░ [7] 학습 기반 가중치 ░░
     adjustment = 0
     if pattern and pattern in stats["patterns"]:
         p = stats["patterns"].get(pattern, {})
@@ -92,7 +87,6 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     adjusted_probability = base_probability + adjustment
 
-    # ░░ [8] 이벤트 영향 계산 ░░
     event_influence = 0.0
     if events and current_time:
         for e in events:
@@ -109,7 +103,6 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
                 elif impact == "low":
                     event_influence += weights.get("event_low", 0) * weight_factor
 
-    # ░░ [9] 추세 각도 분석 ░░
     angle_info = analyze_trend_angle_and_inflection(prices)
     angle = angle_info.get("angle", 0)
     inflections = angle_info.get("inflection_points", [])
@@ -125,15 +118,12 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     elif abs(angle) < 20:
         adjusted_probability -= angle_weight
 
-    # ░░ [10] inflection 근접 보정 ░░
     if inflections and abs(len(prices) - 1 - inflections[-1]) <= 2:
         adjusted_probability += weights.get("inflection", 0)
 
-    # ░░ [11] 거래량 + 급등 보정 ░░
     if volume_factor > 1.2 and abs(change_rate_5m) > 2:
         adjusted_probability += 0.03
 
-    # ░░ [12] 신뢰도 재보정 ░░
     entry_info = {
         "confidence": adjusted_probability,
         "volume_factor": volume_factor,
