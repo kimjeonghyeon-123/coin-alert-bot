@@ -43,32 +43,41 @@ def evaluate_predictions():
             updated_predictions.append(p)
             continue
 
-        if now - p['timestamp'] >= 60 * 60 * 3:
+        if now - p.get('timestamp', 0) >= 60 * 60 * 3:
             future_prices = get_recent_prices(1)
             if not future_prices:
                 updated_predictions.append(p)
                 continue
 
             future_price = future_prices[-1].get('price')
-            direction = p['direction']
+            direction = p.get('direction')
+            take_profit = p.get('take_profit')
+
+            if future_price is None or direction not in ["long", "short"] or take_profit is None:
+                updated_predictions.append(p)
+                continue
+
             is_success = (
-                (direction == "long" and future_price >= p['take_profit']) or
-                (direction == "short" and future_price <= p['take_profit'])
+                (direction == "long" and future_price >= take_profit) or
+                (direction == "short" and future_price <= take_profit)
             )
             result = "success" if is_success else "fail"
             p['result'] = result
             update_learning_stats(p)
 
-            result_msg = f"""✅ *[3시간 전 예측 결과]*
+            try:
+                result_msg = f"""✅ *[3시간 전 예측 결과]*
 
 *방향:* {direction}
 *예측가:* {p['entry']:.2f}
-*익절가:* {p['take_profit']:.2f}
+*익절가:* {take_profit:.2f}
 *실제가격:* {future_price:.2f}
 *결과:* {"🎯 성공!" if result == "success" else "❌ 실패"}
 """
-            time.sleep(60)
-            send_telegram_message(result_msg)
+                time.sleep(60)
+                send_telegram_message(result_msg)
+            except Exception:
+                pass
 
         updated_predictions.append(p)
 
@@ -80,9 +89,10 @@ def update_learning_stats(prediction: Dict[str, Any]):
 
     if key not in stats:
         stats[key] = {"success": 0, "fail": 0}
-    
+
     if 'result' in prediction:
-        stats[key][prediction['result']] += 1
+        if prediction['result'] in stats[key]:
+            stats[key][prediction['result']] += 1
 
     save_json(LEARNING_STATS_FILE, stats)
     update_weights_from_learning(stats)
@@ -118,17 +128,22 @@ def run_simulation(recent_events: Optional[List[Dict[str, Any]]] = None):
     trend = None
     current_time = int(time.time())
 
-    win_rate, ma5, ma20, ma60 = calculate_probability(
-        prices, timestamps, pattern, trend, direction,
-        events=recent_events or [], current_time=current_time,
-        volumes=volumes
-    )
+    try:
+        win_rate, ma5, ma20, ma60 = calculate_probability(
+            prices, timestamps, pattern, trend, direction,
+            events=recent_events or [], current_time=current_time,
+            volumes=volumes
+        )
+    except Exception as e:
+        print("Error in calculate_probability:", e)
+        return
 
     entry = prices[-1]
     stop_loss = entry * (0.98 if direction == "long" else 1.02)
     take_profit = entry * (1.02 if direction == "long" else 0.98)
 
-    message = f"""📊 *시뮬레이션 결과*
+    try:
+        message = f"""📊 *시뮬레이션 결과*
 
 *방향:* {direction.capitalize()}
 *진입가:* {entry:.2f}
@@ -138,7 +153,9 @@ def run_simulation(recent_events: Optional[List[Dict[str, Any]]] = None):
 *패턴:* {pattern or '없음'}
 *예상 승률:* {win_rate * 100:.1f}%
 """
-    send_telegram_message(message)
+        send_telegram_message(message)
+    except Exception:
+        pass
 
     prediction = {
         "timestamp": current_time,
@@ -177,11 +194,15 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     trend = None
     current_time = int(time.time())
 
-    win_rate, ma5, ma20, ma60 = calculate_probability(
-        prices, timestamps, pattern, trend, direction,
-        events=recent_events or [], current_time=current_time,
-        volumes=volumes
-    )
+    try:
+        win_rate, ma5, ma20, ma60 = calculate_probability(
+            prices, timestamps, pattern, trend, direction,
+            events=recent_events or [], current_time=current_time,
+            volumes=volumes
+        )
+    except Exception as e:
+        print("Error in calculate_probability:", e)
+        return None
 
     stop_loss = current_price * (0.98 if direction == "long" else 1.02)
     take_profit = current_price * (1.02 if direction == "long" else 0.98)
@@ -211,6 +232,7 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     save_prediction(result)
 
     return result
+
 
 
 
