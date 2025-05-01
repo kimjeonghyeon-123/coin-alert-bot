@@ -22,7 +22,13 @@ def adjust_confidence(entry_info, simulation_result):
     return smoothed_confidence
 
 def extract_ma_value(ma):
-    return ma.get("value", 0) if isinstance(ma, dict) else ma
+    """dict 또는 숫자 중에서 value만 뽑아내는 함수."""
+    if isinstance(ma, dict):
+        return ma.get("value", 0)
+    elif isinstance(ma, (int, float)):
+        return ma
+    else:
+        return 0
 
 def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None, volume_factor=1, risk_weight=1.0):
     weights = load_weights() or {}
@@ -42,16 +48,20 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     change_rate = change_rate_60m
     speed = abs(prices[-1] - prices[-12]) / (timestamps[-1] - timestamps[-12])
 
-    ma5 = extract_ma_value(moving_average(prices, 5))
-    ma20 = extract_ma_value(moving_average(prices, 20))
-    ma60 = extract_ma_value(moving_average(prices, 60))
+    ma5_raw = moving_average(prices, 5)
+    ma20_raw = moving_average(prices, 20)
+    ma60_raw = moving_average(prices, 60)
+
+    ma5 = extract_ma_value(ma5_raw)
+    ma20 = extract_ma_value(ma20_raw)
+    ma60 = extract_ma_value(ma60_raw)
 
     trend_score = 0
     if all(isinstance(ma, (int, float)) for ma in [ma5, ma20, ma60]):
-        if ma5 > ma20 > ma60:
+        if ma5 > ma20 and ma20 > ma60:
             trend_score += 1
             trend = "up"
-        elif ma5 < ma20 < ma60:
+        elif ma5 < ma20 and ma20 < ma60:
             trend_score -= 1
             trend = "down"
 
@@ -134,3 +144,4 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = adjust_confidence(entry_info, simulation_result={})
     return final_probability, ma5, ma20, ma60
+
