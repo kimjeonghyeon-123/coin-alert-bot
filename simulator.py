@@ -49,7 +49,7 @@ def evaluate_predictions():
                 updated_predictions.append(p)
                 continue
 
-            future_price = future_prices[-1]['price']
+            future_price = future_prices[-1].get('price')
             direction = p['direction']
             is_success = (
                 (direction == "long" and future_price >= p['take_profit']) or
@@ -106,11 +106,15 @@ def run_simulation(recent_events: Optional[List[Dict[str, Any]]] = None):
     if len(history) < 20:
         return
 
-    prices = [x['price'] for x in history]
+    prices = [x.get('price', 0) for x in history]
     volumes = [x.get('volume', 0) for x in history]
-    timestamps = [x['timestamp'] for x in history]
+    timestamps = [x.get('timestamp', 0) for x in history]
+
+    if len(prices) < 12:
+        return
+
     pattern = detect_chart_pattern(history)
-    direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
+    direction = "long" if prices[-1] > prices[-12] else "short"
     trend = None
     current_time = int(time.time())
 
@@ -153,11 +157,15 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     if len(price_slice) < 20:
         return None
 
-    prices = [float(x['close']) for x in price_slice]
-    timestamps = [int(x['timestamp']) for x in price_slice]
+    prices = [float(x.get('close', 0)) for x in price_slice]
+    timestamps = [int(x.get('timestamp', 0)) for x in price_slice]
     volumes = [float(x.get('volume', 0)) for x in price_slice]
+
+    if len(prices) < 12:
+        return None
+
     pattern = detect_chart_pattern(price_slice)
-    direction = "long" if len(prices) >= 12 and prices[-1] > prices[-12] else "short"
+    direction = "long" if prices[-1] > prices[-12] else "short"
     trend = None
     current_time = int(time.time())
 
@@ -195,6 +203,7 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     save_prediction(result)
 
     return result
+
 
 
 
