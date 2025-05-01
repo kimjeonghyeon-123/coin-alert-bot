@@ -120,7 +120,7 @@ def run_simulation(recent_events: Optional[List[Dict[str, Any]]] = None):
 
     win_rate, ma5, ma20, ma60 = calculate_probability(
         prices, timestamps, pattern, trend, direction,
-        events=recent_events, current_time=current_time,
+        events=recent_events or [], current_time=current_time,
         volumes=volumes
     )
 
@@ -171,7 +171,7 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
 
     win_rate, ma5, ma20, ma60 = calculate_probability(
         prices, timestamps, pattern, trend, direction,
-        events=recent_events, current_time=current_time,
+        events=recent_events or [], current_time=current_time,
         volumes=volumes
     )
 
@@ -203,6 +203,7 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     save_prediction(result)
 
     return result
+
 
 
 
