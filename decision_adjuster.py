@@ -77,25 +77,25 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     # ░░ 학습 기반 가중치 보정 ░░
     adjustment = 0
     if pattern and pattern in stats.get("patterns", {}):
-        p = stats["patterns"][pattern]
-        total = p["success"] + p["fail"]
+        p = stats["patterns"].get(pattern, {})
+        total = p.get("success", 0) + p.get("fail", 0)
         if total > 5:
-            winrate = p["success"] / total
-            adjustment += (winrate - 0.5) * weights["pattern"]
+            winrate = p.get("success", 0) / total
+            adjustment += (winrate - 0.5) * weights.get("pattern", 0)
 
     if trend and trend in stats.get("trend", {}):
-        t = stats["trend"][trend]
-        total = t["success"] + t["fail"]
+        t = stats["trend"].get(trend, {})
+        total = t.get("success", 0) + t.get("fail", 0)
         if total > 5:
-            winrate = t["success"] / total
-            adjustment += (winrate - 0.5) * weights["trend"]
+            winrate = t.get("success", 0) / total
+            adjustment += (winrate - 0.5) * weights.get("trend", 0)
 
     if direction in stats.get("direction", {}):
-        d = stats["direction"][direction]
-        total = d["success"] + d["fail"]
+        d = stats["direction"].get(direction, {})
+        total = d.get("success", 0) + d.get("fail", 0)
         if total > 5:
-            winrate = d["success"] / total
-            adjustment += (winrate - 0.5) * weights["direction"]
+            winrate = d.get("success", 0) / total
+            adjustment += (winrate - 0.5) * weights.get("direction", 0)
 
     # ░░ 1차 보정 ░░
     adjusted_probability = base_probability + adjustment
@@ -104,26 +104,26 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     event_influence = 0.0
     if events and current_time:
         for e in events:
-            event_time = e['timestamp']
+            event_time = e.get('timestamp', 0)
             duration = e.get('duration', 3600)
             elapsed = current_time - event_time
             if elapsed < duration:
                 weight_factor = 1 - (elapsed / duration)
                 impact = e.get('impact', 'low')
                 if impact == "high":
-                    event_influence += weights["event_high"] * weight_factor
+                    event_influence += weights.get("event_high", 0) * weight_factor
                 elif impact == "medium":
-                    event_influence += weights["event_medium"] * weight_factor
+                    event_influence += weights.get("event_medium", 0) * weight_factor
                 elif impact == "low":
-                    event_influence += weights["event_low"] * weight_factor
+                    event_influence += weights.get("event_low", 0) * weight_factor
 
     # ░░ 추세 각도 및 inflection 분석 ░░
     angle_info = analyze_trend_angle_and_inflection(prices)
-    angle = angle_info["angle"]
-    inflections = angle_info["inflection_points"]
+    angle = angle_info.get("angle", 0)
+    inflections = angle_info.get("inflection_points", [])
 
     # ░░ 변화율 급등시 추세 각도 영향 증폭 ░░
-    angle_weight = weights["angle"]
+    angle_weight = weights.get("angle", 0)
     if abs(change_rate_5m) > 2:
         angle_weight *= 1.5
 
@@ -136,7 +136,7 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     # ░░ inflection 근접 여부 보정 ░░
     if inflections and abs(len(prices) - 1 - inflections[-1]) <= 2:
-        adjusted_probability += weights["inflection"]
+        adjusted_probability += weights.get("inflection", 0)
 
     # ░░ 거래량 급등 + 변화율 급등 추가 보정 ░░
     if volume_factor > 1.2 and abs(change_rate_5m) > 2:
@@ -153,3 +153,4 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = adjust_confidence(entry_info, simulation_result={})
     return final_probability, ma5, ma20, ma60
+
