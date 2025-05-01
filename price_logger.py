@@ -11,15 +11,21 @@ def update_price():
         price, volume = get_price_and_volume()
         timestamp = int(time.time())
 
-        # 거래량이 None일 경우 0으로 대체
+        # 🛡 price가 dict인 경우 평탄화 (예: {'usd': 63700.0} -> 63700.0)
+        if isinstance(price, dict):
+            price = price.get("usd") or price.get("close") or list(price.values())[0]
+        
+        if not isinstance(price, (int, float)):
+            raise ValueError(f"[❌ 오류] price 값이 숫자가 아님: {price}")
+
         if volume is None:
             print("[⚠️ 경고] 거래량이 None으로 반환되었습니다. 0으로 대체합니다.")
             volume = 0
 
         record = {
             "timestamp": timestamp,
-            "price": price,
-            "volume": volume
+            "price": float(price),
+            "volume": float(volume)
         }
 
         if os.path.exists(price_log_file):
@@ -47,5 +53,21 @@ def get_recent_prices(n=30):
         return []
     with open(price_log_file, "r") as f:
         history = json.load(f)
-    return history[-n:]
+
+    # 🛡 데이터 일관성 검사 및 정제
+    cleaned = []
+    for item in history[-n:]:
+        try:
+            price = item["price"]
+            if isinstance(price, dict):
+                price = price.get("usd") or price.get("close") or list(price.values())[0]
+            cleaned.append({
+                "timestamp": int(item["timestamp"]),
+                "price": float(price),
+                "volume": float(item.get("volume", 0))
+            })
+        except Exception as e:
+            print(f"[⚠️ 스킵됨] 잘못된 데이터: {item}, 오류: {e}")
+    return cleaned
+
 
