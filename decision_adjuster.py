@@ -21,10 +21,14 @@ def adjust_confidence(entry_info, simulation_result):
     smoothed_confidence = 1 / (1 + math.exp(-12 * (confidence - 0.5)))
     return smoothed_confidence
 
-
 def calculate_probability(prices, timestamps, pattern, trend, direction, events=None, current_time=None, volume_factor=1, risk_weight=1.0):
-    weights = load_weights()
-    stats = load_learning_stats()
+    weights = load_weights() or {}
+    stats = load_learning_stats() or {}
+
+    # dict 키가 없거나 None인 경우 안전하게 초기화
+    stats.setdefault("patterns", {})
+    stats.setdefault("trend", {})
+    stats.setdefault("direction", {})
 
     # ░░ [1] prices가 dict일 경우 숫자만 추출 ░░
     if isinstance(prices[0], dict):
@@ -65,21 +69,21 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     # ░░ [7] 학습 기반 가중치 ░░
     adjustment = 0
-    if pattern and pattern in stats.get("patterns", {}):
+    if pattern and pattern in stats["patterns"]:
         p = stats["patterns"].get(pattern, {})
         total = p.get("success", 0) + p.get("fail", 0)
         if total > 5:
             winrate = p.get("success", 0) / total
             adjustment += (winrate - 0.5) * weights.get("pattern", 0)
 
-    if trend and trend in stats.get("trend", {}):
+    if trend and trend in stats["trend"]:
         t = stats["trend"].get(trend, {})
         total = t.get("success", 0) + t.get("fail", 0)
         if total > 5:
             winrate = t.get("success", 0) / total
             adjustment += (winrate - 0.5) * weights.get("trend", 0)
 
-    if direction in stats.get("direction", {}):
+    if direction in stats["direction"]:
         d = stats["direction"].get(direction, {})
         total = d.get("success", 0) + d.get("fail", 0)
         if total > 5:
@@ -140,5 +144,3 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = adjust_confidence(entry_info, simulation_result={})
     return final_probability, ma5, ma20, ma60
-
-
