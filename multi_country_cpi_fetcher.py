@@ -25,11 +25,14 @@ def fetch_latest_cpi_from_dbnomics(country_code):
         latest_period = sorted(observations.keys())[-1]
         latest_value = float(observations[latest_period])
 
+        # 예상치는 아직 연동되지 않음 (예시로 None으로 처리)
+        expected_value = None  # 나중에 다른 방법으로 예상치를 추가할 수 있음
+
         return {
             "country": country_code,
             "time": latest_period,
             "actual": latest_value,
-            "expected": None  # 예상치는 별도 연동
+            "expected": expected_value  # 예상치 추가
         }
     except Exception as e:
         print(f"❌ {country_code} CPI 수집 실패: {e}")
@@ -66,6 +69,7 @@ def log_all_country_cpi():
 
         log.setdefault(event_time, {})[country] = {
             "actual": cpi["actual"],
+            "expected": cpi["expected"],  # 예상치 추가
             "logged_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         }
         print(f"📌 {country} CPI 기록됨: {event_time} / {cpi['actual']}")
@@ -90,6 +94,7 @@ def auto_process_all_countries():
 
 if __name__ == "__main__":
     log_all_country_cpi()
+
 
 
 
