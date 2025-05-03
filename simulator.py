@@ -1,6 +1,7 @@
 import time
 import json
 import os
+import traceback
 from typing import List, Optional, Dict, Any
 from price_logger import get_recent_prices
 from notifier import send_telegram_message
@@ -77,7 +78,7 @@ def evaluate_predictions():
                 time.sleep(60)
                 send_telegram_message(result_msg)
             except Exception:
-                pass
+                traceback.print_exc()
 
         updated_predictions.append(p)
 
@@ -136,6 +137,7 @@ def run_simulation(recent_events: Optional[List[Dict[str, Any]]] = None):
         )
     except Exception as e:
         print("Error in calculate_probability:", e)
+        traceback.print_exc()
         return
 
     entry = prices[-1]
@@ -149,13 +151,13 @@ def run_simulation(recent_events: Optional[List[Dict[str, Any]]] = None):
 *진입가:* {entry:.2f}
 *손절가:* {stop_loss:.2f}
 *익절가:* {take_profit:.2f}
-*이동평균:* ma5={ma5:.2f if ma5 else 'N/A'}, ma20={ma20:.2f if ma20 else 'N/A'}, ma60={ma60:.2f if ma60 else 'N/A'}
+*이동평균:* ma5={f"{ma5:.2f}" if ma5 else 'N/A'}, ma20={f"{ma20:.2f}" if ma20 else 'N/A'}, ma60={f"{ma60:.2f}" if ma60 else 'N/A'}
 *패턴:* {pattern or '없음'}
 *예상 승률:* {win_rate * 100:.1f}%
 """
         send_telegram_message(message)
     except Exception:
-        pass
+        traceback.print_exc()
 
     prediction = {
         "timestamp": current_time,
@@ -202,6 +204,7 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
         )
     except Exception as e:
         print("Error in calculate_probability:", e)
+        traceback.print_exc()
         return None
 
     stop_loss = current_price * (0.98 if direction == "long" else 1.02)
@@ -232,6 +235,7 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     save_prediction(result)
 
     return result
+
 
 
 
