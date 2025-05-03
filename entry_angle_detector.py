@@ -77,7 +77,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
     trend = get_current_trend(prices, volumes)
     event_keys = get_latest_all_cpi_directions()
 
-    # 🔹 양 방향 보정 확률 계산 (오류 수정된 부분)
+    # 🔹 양 방향 보정 확률 계산
     adjusted = {
         direction: adjust_confidence(
             confidence=conf["confidence"],
@@ -85,7 +85,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
             direction=direction,
             trend=trend,
             event_keys=event_keys,
-            simulation_result={}
+            simulation_result={}  # 💡 여기서 오류 수정됨
         )
         for direction, conf in base_confidences.items()
     }
@@ -94,7 +94,6 @@ def check_realtime_entry_signal(is_pattern_allowed):
     best_direction = max(adjusted, key=lambda d: adjusted[d])
     best_confidence = adjusted[best_direction]
 
-    # 🔸 best_confidence가 None일 경우 기본 값 설정
     if best_confidence is None:
         print("[오류] 신뢰도 계산 실패: best_confidence가 None입니다.")
         return
@@ -118,10 +117,8 @@ def check_realtime_entry_signal(is_pattern_allowed):
             if lines:
                 cpi_reason = "\n*CPI 근거:*\n" + "\n".join(lines)
 
-        # 🔹 신호 강도 결정
         signal_strength = "🔥 강력 신호" if best_confidence >= 0.90 else "✅ 추천 신호"
 
-        # 🔹 텔레그램 메시지 전송 포맷
         message = f"""{signal_strength} *실시간 진입각 탐지!*  
 *방향:* {best_direction.upper()}  
 *현재가:* {current_price:.2f}  
@@ -150,6 +147,7 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
+
 
 
 
