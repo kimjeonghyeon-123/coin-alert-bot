@@ -30,8 +30,15 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
     stats.setdefault("trend", {})
     stats.setdefault("direction", {})
 
-    if isinstance(prices[0], dict):
-        prices = [p.get("price", 0) for p in prices]
+    # ✅ 가격 dict 처리 (예: {'price': 63700.0} → 63700.0)
+    cleaned_prices = []
+    for p in prices:
+        if isinstance(p, dict):
+            cleaned = p.get("price") or p.get("close") or list(p.values())[0]
+        else:
+            cleaned = p
+        cleaned_prices.append(float(cleaned))
+    prices = cleaned_prices
 
     change_rate_5m = (prices[-1] - prices[-2]) / prices[-2] * 100
     change_rate_30m = (prices[-1] - prices[-6]) / prices[-6] * 100
@@ -132,5 +139,6 @@ def calculate_probability(prices, timestamps, pattern, trend, direction, events=
 
     final_probability = adjust_confidence(entry_info, simulation_result={})
     return final_probability, ma5, ma20, ma60
+
 
 
