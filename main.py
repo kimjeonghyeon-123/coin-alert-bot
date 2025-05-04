@@ -1,79 +1,112 @@
+import json
 import os
-import time
-from keep_alive import keep_alive
-from simulator import run_simulation
-from price_logger import update_price
-from entry_angle_detector import check_realtime_entry_signal, detect_chart_patterns
-from config import MODE
+import requests
+from datetime import datetime
+from cpi_predictor import predict_next_cpi  # ✅ 예측 함수 가져오기
 
-# ✅ 이벤트 감지
-from event_monitor import check_new_events, get_recent_events
-from notifier import send_event_alert
+# ✅ 미국 CPI 코드 (FRED 코드 기준)
+COUNTRY_CPI_CODES = {
+    "USA": "CPIAUCNS"  # 미국 전체 도시 소비자물가지수
+}
 
-# ✅ 다국가 CPI 자동 처리
-from multi_country_cpi_fetcher import auto_process_all_countries
+# ✅ FRED API 키
+FRED_API_KEY = "4c660d85c6caa3480c4dd60c1e2fa823"
 
-# 패턴 필터링
-if MODE == "real":
-    from trusted_patterns import TRUSTED_PATTERNS
-else:
-    TRUSTED_PATTERNS = None
+CPI_EVENT_LOG = "cpi_event_log.json"
 
-def is_pattern_allowed(pattern_name):
-    if TRUSTED_PATTERNS is None:
-        return True
-    return pattern_name in TRUSTED_PATTERNS
 
-# 주기 설정 (초 단위)
-PRICE_LOG_INTERVAL = 60
-ENTRY_SIGNAL_INTERVAL = 30
-SIMULATION_INTERVAL = 10800  # 3시간
-EVENT_CHECK_INTERVAL = 60
-CPI_PROCESS_INTERVAL = 3600  # 1시간
+def fetch_latest_cpi_from_dbnomics(country_code):
+    """
+    FRED API 기반으로 최신 CPI를 가져오고, 예상치가 없으면 예측하여 보완.
+    """
+    series_code = COUNTRY_CPI_CODES[country_code]
+    url = f"https://api.stlouisfed.org/fred/series/observations"
+    params = {
+        "series_id": series_code,
+        "api_key": FRED_API_KEY,
+        "file_type": "json"
+    }
 
-# 타이머 초기화
-t_last_price = time.time()
-t_last_entry = time.time()
-t_last_sim = time.time() - SIMULATION_INTERVAL + 5
-t_last_event = time.time() - EVENT_CHECK_INTERVAL + 3
-t_last_cpi = time.time() - CPI_PROCESS_INTERVAL + 10
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
 
-keep_alive()
-print("[시스템 시작] Bitcoin 실시간 모니터링 중...")
+        observations = data.get("observations", [])
+        if not observations:
+            raise ValueError("관측값 없음")
 
-while True:
-    now = time.time()
+        latest_entry = observations[-1]
+        latest_period = latest_entry["date"]
+        latest_value = float(latest_entry["value"])
 
-    # 가격 기록
-    if now - t_last_price >= PRICE_LOG_INTERVAL:
-        update_price()
-        t_last_price = now
+        # ✅ 예상치 예측 (자동)
+        expected_value = predict_next_cpi(country_code, observations)
 
-    # 실시간 진입 신호 체크
-    if now - t_last_entry >= ENTRY_SIGNAL_INTERVAL:
-        recent_events = get_recent_events()
-        detect_chart_patterns(recent_events)
-        check_realtime_entry_signal(is_pattern_allowed)
-        t_last_entry = now
+        return {
+            "country": country_code,
+            "time": latest_period,
+            "actual": latest_value,
+            "expected": expected_value
+        }
+    except Exception as e:
+        print(f"❌ {country_code} CPI 수집 실패: {e}")
+        return None
 
-    # 시뮬레이션 + 자동 학습
-    if now - t_last_sim >= SIMULATION_INTERVAL:
-        recent_events = get_recent_events()
-        run_simulation(recent_events=recent_events)
-        t_last_sim = now
 
-    # 이벤트 감지
-    if now - t_last_event >= EVENT_CHECK_INTERVAL:
-        new_events = check_new_events()
-        if new_events:
-            for event in new_events:
-                print(f"[이벤트 감지] {event['summary']} - 영향도: {event['impact']}")
-                send_event_alert(event)
-        t_last_event = now
+def save_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
 
-    # 다국가 CPI 처리
-    if now - t_last_cpi >= CPI_PROCESS_INTERVAL:
-        auto_process_all_countries()
-        t_last_cpi = now
+
+def load_json(path):
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"❌ JSON 로드 오류: {e}")
+        return {}
+
+
+def log_all_country_cpi():
+    log = load_json(CPI_EVENT_LOG)
+    for country in COUNTRY_CPI_CODES:
+        cpi = fetch_latest_cpi_from_dbnomics(country)
+        if not cpi:
+            continue
+
+        event_time = cpi['time']
+        if event_time in log and country in log[event_time]:
+            print(f"✅ 이미 기록된 {country} CPI ({event_time})")
+            continue
+
+        log.setdefault(event_time, {})[country] = {
+            "actual": cpi["actual"],
+            "expected": cpi["expected"],
+            "logged_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        print(f"📌 {country} CPI 기록됨: {event_time} / {cpi['actual']} (예상: {cpi['expected']})")
+
+    save_json(CPI_EVENT_LOG, log)
+
+
+def fetch_latest_cpis():
+    results = []
+    for country in COUNTRY_CPI_CODES:
+        cpi = fetch_latest_cpi_from_dbnomics(country)
+        if cpi:
+            results.append(cpi)
+    return results
+
+
+def auto_process_all_countries():
+    return fetch_latest_cpis()
+
+
+if __name__ == "__main__":
+    log_all_country_cpi()
+
 
 
