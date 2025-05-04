@@ -14,7 +14,7 @@ def fetch_recent_news():
         response = requests.get(NEWS_API_URL)
         if response.status_code == 200:
             posts = response.json().get("results", [])
-            return [{"title": p["title"], "impact": None, "timestamp": time.time()} for p in posts]
+            return [{"title": p.get("title", ""), "impact": None, "timestamp": time.time()} for p in posts]
     except Exception as e:
         print(f"[뉴스 수집 오류] {e}")
     return []
@@ -23,7 +23,8 @@ def fetch_economic_indicators():
     try:
         response = requests.get(ECONOMIC_DATA_URL)
         if response.status_code == 200:
-            return [{"indicator": "CPI", "value": 3.2, "expected": 3.1, "timestamp": time.time()}]  # 예시
+            # 실제로는 JSON 파싱 필요하지만 예시는 고정값
+            return [{"indicator": "CPI", "value": 3.2, "expected": 3.1, "timestamp": time.time()}]
     except Exception as e:
         print(f"[경제지표 수집 오류] {e}")
     return []
@@ -33,7 +34,15 @@ def fetch_order_flow():
         response = requests.get(ORDER_FLOW_API)
         if response.status_code == 200:
             data = response.json().get("transactions", [])
-            return [{"type": tx["transaction_type"], "amount": tx["amount"], "price": tx["amount_usd"], "timestamp": tx["timestamp"]} for tx in data]
+            return [
+                {
+                    "type": tx.get("transaction_type", "unknown"),
+                    "amount": tx.get("amount", 0),
+                    "price": tx.get("amount_usd", 0),
+                    "timestamp": tx.get("timestamp", time.time())
+                }
+                for tx in data
+            ]
     except Exception as e:
         print(f"[고래흐름 수집 오류] {e}")
     return []
@@ -55,13 +64,12 @@ def analyze_event_impact(event):
         if kw in title:
             return 0.3
 
-    # 기본값: 낮은 영향
     return 0.2
 
 def is_duplicate_event(summary):
     now = time.time()
     for e in recent_events:
-        if e["summary"] == summary and now - e["timestamp"] < 300:
+        if e.get("summary") == summary and now - e.get("timestamp", 0) < 300:
             return True
     return False
 
@@ -79,21 +87,31 @@ def check_new_events():
     high_impact_events = []
 
     for item in news:
+        title = item.get("title", "")
         impact_score = analyze_event_impact(item)
-        if impact_score >= 0.7 and not is_duplicate_event(item["title"]):
-            high_impact_events.append(("뉴스", item["title"], impact_score))
+        if impact_score >= 0.7 and not is_duplicate_event(title):
+            high_impact_events.append(("뉴스", title, impact_score))
 
     for econ in indicators:
-        surprise = abs(econ["value"] - econ["expected"]) / econ["expected"]
-        if surprise > 0.05:
-            summary = f"{econ['indicator']} 발표 - 예상치 대비 변화율 {round(surprise*100, 1)}%"
-            if not is_duplicate_event(summary):
-                score = min(0.8, 0.4 + surprise)
-                high_impact_events.append(("경제지표", summary, round(score, 2)))
+        actual = econ.get("value")
+        expected = econ.get("expected")
+        if actual is not None and expected not in (None, 0):
+            try:
+                surprise = abs(actual - expected) / expected
+                if surprise > 0.05:
+                    summary = f"{econ.get('indicator', '지표')} 발표 - 예상치 대비 변화율 {round(surprise*100, 1)}%"
+                    if not is_duplicate_event(summary):
+                        score = min(0.8, 0.4 + surprise)
+                        high_impact_events.append(("경제지표", summary, round(score, 2)))
+            except Exception as e:
+                print(f"[경제지표 분석 오류] {e}")
 
     for flow in order_flows:
-        if flow["amount"] >= 1000:
-            summary = f"{flow['type']} {flow['amount']} BTC @ {flow['price']}"
+        amount = flow.get("amount", 0)
+        price = flow.get("price", 0)
+        ftype = flow.get("type", "unknown")
+        if amount >= 1000:
+            summary = f"{ftype} {round(amount, 2)} BTC @ ${round(price, 0):,.0f}"
             if not is_duplicate_event(summary):
                 high_impact_events.append(("고래매매", summary, 0.9))
 
@@ -106,14 +124,20 @@ def check_new_events():
         recent_events.append(event_obj)
         trim_recent_events()
 
-        msg = f"🚨 *{kind} 이벤트 감지됨*\n내용: `{detail}`\n영향 추정 점수: {score}"
-        send_telegram_message(msg)
+        try:
+            # 텔레그램 메시지 이스케이프 처리
+            safe_detail = detail.replace("`", "'").replace("*", "")
+            msg = f"🚨 *{kind} 이벤트 감지됨*\n내용: `{safe_detail}`\n영향 추정 점수: {score}"
+            send_telegram_message(msg)
+        except Exception as e:
+            print(f"[텔레그램 전송 오류] {e}")
 
     return high_impact_events
 
 def get_recent_events():
     cutoff = time.time() - 600
-    return [e for e in recent_events if e["timestamp"] >= cutoff]
+    return [e for e in recent_events if e.get("timestamp", 0) >= cutoff]
 
 if __name__ == "__main__":
     check_new_events()
+
