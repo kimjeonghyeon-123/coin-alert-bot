@@ -3,9 +3,9 @@ import os
 import requests
 from datetime import datetime
 
-# ✅ 미국 CPI 코드 (FRED 코드 기준)
+# ✅ 미국 CPI 코드 (FRED 기준)
 COUNTRY_CPI_CODES = {
-    "USA": "CPIAUCNS"  # 미국 전체 도시 소비자물가지수 (Consumer Price Index for All Urban Consumers)
+    "USA": "CPIAUCNS"  # 미국 전체 도시 소비자물가지수
 }
 
 # ✅ FRED API 키
@@ -39,7 +39,7 @@ def fetch_latest_cpi_from_dbnomics(country_code):
         latest_period = latest_entry["date"]
         latest_value = float(latest_entry["value"])
 
-        expected_value = None  # 추후 예측치 연동 예정
+        expected_value = None  # TODO: 향후 predict_next_cpi(country_code) 연동 예정
 
         return {
             "country": country_code,
@@ -105,6 +105,7 @@ def auto_process_all_countries():
 
 if __name__ == "__main__":
     log_all_country_cpi()
+
 
 
 
