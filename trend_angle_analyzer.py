@@ -23,6 +23,8 @@ def classify_angle(degree):
 
 # 고점/저점 기반 변곡점 탐지
 def detect_inflection_points(prices, window=5):
+    if isinstance(prices, dict):
+        prices = sorted(prices.items())  # (timestamp, price) 리스트로 변환
     if len(prices) < window:
         return []
 
@@ -39,6 +41,8 @@ def detect_inflection_points(prices, window=5):
 
 # 추세 분석 + 변곡점 기반 전환 분석 + 진입 판단 요소 종합
 def analyze_trend_angle_and_inflection(prices, angle_window=20, inflection_window=5):
+    if isinstance(prices, dict):
+        prices = sorted(prices.items())  # (timestamp, price) 리스트로 변환
     if len(prices) < angle_window:
         return {
             "angle": None,
@@ -70,7 +74,6 @@ def analyze_trend_angle_and_inflection(prices, angle_window=20, inflection_windo
     # 최근 변곡점 이후 방향 확인
     recent_inflection_reversal = False
     if len(inflection_points) >= 2:
-        # 마지막 2개의 변곡점 방향 비교
         _, p1 = inflection_points[-2]
         _, p2 = inflection_points[-1]
         if direction == "up" and p2 > p1:
@@ -81,7 +84,7 @@ def analyze_trend_angle_and_inflection(prices, angle_window=20, inflection_windo
     # 진입 시그널 판단 기준: 급한 각도 + 변곡점 직후 방향 일치
     entry_signal = angle_type == 'sharp' and recent_inflection_reversal
 
-    # 매수/매도 강도 분류 (가상 값: 추후 volume 또는 price rate와 결합 가능)
+    # 매수/매도 강도 분류
     if angle_type == 'sharp' and direction == "up":
         trend_strength = "strong_buy"
     elif angle_type == 'sharp' and direction == "down":
@@ -99,3 +102,4 @@ def analyze_trend_angle_and_inflection(prices, angle_window=20, inflection_windo
         "trend_strength": trend_strength,
         "direction": direction
     }
+
