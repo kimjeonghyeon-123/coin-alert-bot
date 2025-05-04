@@ -6,8 +6,8 @@ from price_fetcher import get_price_and_volume
 from learning_updater import update_learning_data_from_event
 from event_impact_estimator import estimate_next_direction, estimate_impact_duration
 from notifier import send_telegram_message
-from multi_country_cpi_fetcher import fetch_latest_cpis  # ✅ 다국가 CPI fetcher
-from cpi_predictor import predict_next_cpi  # ✅ FRED 기반 CPI 예측기 추가
+from multi_country_cpi_fetcher import fetch_latest_cpis
+from cpi_predictor import predict_next_cpi  # ✅ FRED 기반 CPI 예측
 
 CPI_EVENT_LOG = "cpi_event_log.json"
 BTC_PRICE_LOG = "btc_price_log.json"
@@ -35,7 +35,7 @@ def is_already_logged(country, event_time):
 
 def log_cpi_event(country, event_time, expected_cpi, actual_cpi):
     if expected_cpi is None and country == "United States":
-        expected_cpi = predict_next_cpi()  # ✅ 예측치 자동 적용
+        expected_cpi = predict_next_cpi()
 
     diff = actual_cpi - expected_cpi
     direction = "hot" if diff > 0 else "cool" if diff < 0 else "inline"
@@ -81,7 +81,6 @@ def analyze_cpi_reaction(cpi_time_str, duration_min=60):
     avg_volume = sum([p[1][1] for p in prices]) / len(prices)
 
     change_percent = ((end_price - start_price) / start_price) * 100
-
     print(f"📊 CPI 반응 분석: {duration_min}분 동안 {change_percent:.2f}% 변화 / 평균 거래량: {avg_volume:.2f}")
     return change_percent
 
@@ -97,7 +96,7 @@ def auto_process_cpi_events():
         expected = item.get("expected")
         actual = item.get("actual")
 
-        if not all([country, event_time, actual]):  # expected 없이도 처리
+        if not all([country, event_time, actual]):
             print(f"⚠️ {country or '국가명 없음'} CPI 정보 불완전 - 스킵")
             continue
 
@@ -114,10 +113,11 @@ def auto_process_cpi_events():
             print(f"🧠 {country} CPI 학습 반영 완료")
 
             try:
+                expected_str = f"{expected:.2f}" if expected is not None else f"{predict_next_cpi():.2f}"
                 send_telegram_message(f"""📈 *{country} CPI 발표 감지됨!*
 
 *시간:* {event_time}
-*예상치:* {expected:.2f if expected is not None else predict_next_cpi():.2f}
+*예상치:* {expected_str}
 *실제치:* {actual:.2f}
 *방향:* {direction.upper()}
 *가격 변화 추정:* {change:.2f}% ({estimated_duration}분 기준)
@@ -155,7 +155,6 @@ def get_latest_cpi_direction(country="United States"):
         return "neutral"
 
 def get_latest_all_cpi_directions():
-    """✅ entry_angle_detector.py에서 import하는 함수"""
     result = {}
     try:
         cpi_list = fetch_latest_cpis()
@@ -174,6 +173,7 @@ def get_latest_all_cpi_directions():
     except Exception as e:
         print(f"❌ get_latest_all_cpi_directions 오류: {e}")
     return result
+
 
 
 
