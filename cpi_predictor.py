@@ -57,12 +57,15 @@ def train_cpi_prediction_model():
     model.fit(X, y)
     return model, df
 
-def predict_next_cpi():
+def predict_next_cpi(country="USA", date=None):
+    if country != "USA":
+        raise ValueError("❌ 현재는 미국(USA)만 지원됩니다.")
+
     model, df = train_cpi_prediction_model()
     latest = df.iloc[-1][["WTI", "Unemployment", "RetailSales"]].values.reshape(1, -1)
     predicted_cpi = model.predict(latest)[0]
-    print(f"📈 예측된 다음 CPI: {predicted_cpi:.2f}")
-    return predicted_cpi
+    return round(predicted_cpi, 2)
 
 if __name__ == "__main__":
-    predict_next_cpi()
+    print(f"📈 예측된 다음 CPI: {predict_next_cpi()}") 
+
