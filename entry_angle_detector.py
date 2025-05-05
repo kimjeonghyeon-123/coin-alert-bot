@@ -85,7 +85,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
             direction=direction,
             trend=trend,
             event_keys=event_keys,
-            simulation_result={}  # 💡 여기서 오류 수정됨
+            simulation_result={}  # 나중에 시뮬레이션 연동 가능
         )
         for direction, conf in base_confidences.items()
     }
@@ -115,7 +115,7 @@ def check_realtime_entry_signal(is_pattern_allowed):
                     line = f"→ {key}: 평균 {info['average_change_percent']}%, 상승 확률 {info['positive_rate_percent']}% → *{info['bias']}*"
                     lines.append(line)
             if lines:
-                cpi_reason = "\n*CPI 근거:*\n" + "\n".join(lines)
+                cpi_reason = "\n\n*CPI 근거:*\n" + "\n".join(lines)
 
         signal_strength = "🔥 강력 신호" if best_confidence >= 0.90 else "✅ 추천 신호"
 
@@ -147,6 +147,7 @@ def detect_chart_pattern(prices):
     elif prices[-1] < prices[-3] > prices[-5] and prices[-3] < prices[-5]:
         return "M-Pattern"
     return None
+
 
 
 
