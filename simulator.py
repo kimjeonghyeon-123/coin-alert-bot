@@ -176,10 +176,7 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     if len(price_slice) < 20:
         return None
 
-    prices = []
-    volumes = []
-    timestamps = []
-
+    prices, volumes, timestamps = [], [], []
     for x in price_slice:
         try:
             prices.append(float(x.get('close')))
@@ -231,15 +228,6 @@ def simulate_entry(price_slice: List[Dict[str, Any]], current_price: float, simu
     data = load_json(SIMULATION_RESULTS_FILE, [])
     data.append(result)
     save_json(SIMULATION_RESULTS_FILE, data, limit=500)
-
     save_prediction(result)
 
     return result
-
-
-
-
-
-
-
-
